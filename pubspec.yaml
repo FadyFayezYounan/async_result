@@ -1,0 +1,15 @@
+name: async_result
+description: A Dart package that provides a type-safe way to handle different states of asynchronous operations.
+version: 1.0.1
+homepage: https://github.com/FadyFayezYounan/async_result.git
+
+environment:
+  sdk: ^3.5.1
+
+# Add regular dependencies here.
+#dependencies:
+# path: ^1.8.0
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.24.0
