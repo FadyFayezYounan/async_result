@@ -5,50 +5,48 @@ import 'package:async_result/async_result.dart';
 
 // Usage examples
 void main() async {
-  final rsult = AsyncResult.data('Hello, World!');
-  print(rsult.toString());
-  // // Using Example 1
-  // print('Fetching todos...');
-  // final todosResult = await fetchTodos();
-  // todosResult.when(
-  //   whenInitial: () => print('Initial state (unexpected)'),
-  //   whenLoading: () => print('Loading todos...'),
-  //   whenData: (todos) => print('Fetched ${todos.length} todos: $todos'),
-  //   whenError: (error) => print('Error fetching todos: $error'),
-  // );
+  // Using Example 1
+  print('Fetching todos...');
+  final todosResult = await fetchTodos();
+  todosResult.when(
+    whenInitial: () => print('Initial state (unexpected)'),
+    whenLoading: () => print('Loading todos...'),
+    whenData: (todos) => print('Fetched ${todos.length} todos: $todos'),
+    whenError: (error) => print('Error fetching todos: $error'),
+  );
 
-  // // Using Example 2
-  // print('\nPerforming computation...');
-  // final computationResult = await simulateComputation();
-  // computationResult.when(
-  //   whenInitial: () => print('Initial state (unexpected)'),
-  //   whenLoading: () => print('Computing...'),
-  //   whenData: (result) => print('Computation result: $result'),
-  //   whenError: (error) => print('Computation error: $error'),
-  // );
+  // Using Example 2
+  print('\nPerforming computation...');
+  final computationResult = await simulateComputation();
+  computationResult.when(
+    whenInitial: () => print('Initial state (unexpected)'),
+    whenLoading: () => print('Computing...'),
+    whenData: (result) => print('Computation result: $result'),
+    whenError: (error) => print('Computation error: $error'),
+  );
 
-  // // Using Example 3
-  // print('\nProcessing data...');
-  // final initialResult = AsyncResult<int, String>.data(10);
-  // final processedResult = await processData(initialResult);
-  // processedResult.when(
-  //   whenInitial: () => print('Initial state (unexpected)'),
-  //   whenLoading: () => print('Processing...'),
-  //   whenData: (result) => print('Processed result: $result'),
-  //   whenError: (error) => print('Processing error: $error'),
-  // );
+  // Using Example 3
+  print('\nProcessing data...');
+  final initialResult = AsyncResult<int, String>.data(10);
+  final processedResult = await processData(initialResult);
+  processedResult.when(
+    whenInitial: () => print('Initial state (unexpected)'),
+    whenLoading: () => print('Processing...'),
+    whenData: (result) => print('Processed result: $result'),
+    whenError: (error) => print('Processing error: $error'),
+  );
 
-  // // Using Example 5
-  // print('\nCombining results...');
-  // final result1 = AsyncResult<int, String>.data(42);
-  // final result2 = AsyncResult<String, String>.data('Hello');
-  // final combinedResult = await combineResults(result1, result2);
-  // combinedResult.when(
-  //   whenInitial: () => print('Initial state (unexpected)'),
-  //   whenLoading: () => print('Combining...'),
-  //   whenData: (result) => print(result),
-  //   whenError: (error) => print('Combining error: $error'),
-  // );
+  // Using Example 5
+  print('\nCombining results...');
+  final result1 = AsyncResult<int, String>.data(42);
+  final result2 = AsyncResult<String, String>.data('Hello');
+  final combinedResult = await combineResults(result1, result2);
+  combinedResult.when(
+    whenInitial: () => print('Initial state (unexpected)'),
+    whenLoading: () => print('Combining...'),
+    whenData: (result) => print(result),
+    whenError: (error) => print('Combining error: $error'),
+  );
 }
 
 // Example 1: Simulating data fetch from an API
