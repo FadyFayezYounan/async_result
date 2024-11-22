@@ -1,3 +1,9 @@
+## 1.0.4
+
+- Add new methods and update readme file.
+
+```dart
+
 ## 1.0.3
 
 - Add new methods whenOrNull, maybeMap, mapOrNull and getDataOrElse.
@@ -13,3 +19,4 @@
 ## 1.0.0
 
 - Initial version.
+```

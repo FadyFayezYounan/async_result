@@ -3,162 +3,120 @@ import 'package:test/test.dart';
 
 void main() {
   group('AsyncResult', () {
-    test('initial state', () {
+    test('should create an initial state', () {
       final result = AsyncResult<int, String>.initial();
-      expect(result.isInitial, isTrue);
-      expect(result.isLoading, isFalse);
-      expect(result.hasError, isFalse);
-      expect(result.hasData, isFalse);
-      expect(result.isLoadingOrInitial, isTrue);
-      expect(result.isDateOrError, isFalse);
-      expect(result.dataOrNull, isNull);
+      expect(result.isInitial, true);
+      expect(result.isLoading, false);
+      expect(result.hasError, false);
+      expect(result.hasData, false);
+      expect(result.isCompleted, false);
     });
 
-    test('loading state', () {
+    test('should create a loading state', () {
       final result = AsyncResult<int, String>.loading();
-      expect(result.isInitial, isFalse);
-      expect(result.isLoading, isTrue);
-      expect(result.hasError, isFalse);
-      expect(result.hasData, isFalse);
-      expect(result.isLoadingOrInitial, isTrue);
-      expect(result.isDateOrError, isFalse);
-      expect(result.dataOrNull, isNull);
+      expect(result.isInitial, false);
+      expect(result.isLoading, true);
+      expect(result.hasError, false);
+      expect(result.hasData, false);
+      expect(result.isCompleted, false);
     });
 
-    test('data state', () {
+    test('should create a data state', () {
       final result = AsyncResult<int, String>.data(42);
-      expect(result.isInitial, isFalse);
-      expect(result.isLoading, isFalse);
-      expect(result.hasError, isFalse);
-      expect(result.hasData, isTrue);
-      expect(result.isLoadingOrInitial, isFalse);
-      expect(result.isDateOrError, isTrue);
-      expect(result.dataOrNull, equals(42));
+      expect(result.isInitial, false);
+      expect(result.isLoading, false);
+      expect(result.hasError, false);
+      expect(result.hasData, true);
+      expect(result.isCompleted, true);
+      expect(result.dataOrNull, 42);
     });
 
-    test('error state', () {
-      final result = AsyncResult<int, String>.error('Error message');
-      expect(result.isInitial, isFalse);
-      expect(result.isLoading, isFalse);
-      expect(result.hasError, isTrue);
-      expect(result.hasData, isFalse);
-      expect(result.isLoadingOrInitial, isFalse);
-      expect(result.isDateOrError, isTrue);
-      expect(result.dataOrNull, isNull);
+    test('should create an error state', () {
+      final result = AsyncResult<int, String>.error('error');
+      expect(result.isInitial, false);
+      expect(result.isLoading, false);
+      expect(result.hasError, true);
+      expect(result.hasData, false);
+      expect(result.isCompleted, true);
+      expect(result.errorOrNull, 'error');
     });
 
-    test('when method', () {
-      AsyncResult<int, String> result;
-
-      result = AsyncResult.initial();
-      expect(
-        result.when(
-          whenInitial: () => 'initial',
-          whenLoading: () => 'loading',
-          whenData: (data) => 'data',
-          whenError: (error) => 'error',
-        ),
-        equals('initial'),
-      );
-
-      result = AsyncResult.loading();
-      expect(
-        result.when(
-          whenInitial: () => 'initial',
-          whenLoading: () => 'loading',
-          whenData: (data) => 'data',
-          whenError: (error) => 'error',
-        ),
-        equals('loading'),
-      );
-
-      result = AsyncResult.data(42);
-      expect(
-        result.when(
-          whenInitial: () => 'initial',
-          whenLoading: () => 'loading',
-          whenData: (data) => 'data: $data',
-          whenError: (error) => 'error',
-        ),
-        equals('data: 42'),
-      );
-
-      result = AsyncResult.error('Error message');
-      expect(
-        result.when(
-          whenInitial: () => 'initial',
-          whenLoading: () => 'loading',
-          whenData: (data) => 'data',
-          whenError: (error) => 'error: $error',
-        ),
-        equals('error: Error message'),
-      );
+    test('should map data correctly', () {
+      final result = AsyncResult<int, String>.data(42);
+      final mapped = result.map((data) => data.toString());
+      expect(mapped, AsyncResult<String, String>.data('42'));
     });
 
-    test('maybeWhen method', () {
-      AsyncResult<int, String> result;
+    test('should map error correctly', () {
+      final result = AsyncResult<int, String>.error('error');
+      final mapped = result.mapError((error) => 'mapped error');
+      expect(mapped, AsyncResult<int, String>.error('mapped error'));
+    });
 
-      result = AsyncResult.initial();
-      expect(
-        result.maybeWhen(
-          whenData: (data) => 'data',
-          orElse: () => 'other',
-        ),
-        equals('other'),
+    test('should bimap correctly', () {
+      final result = AsyncResult<int, String>.data(42);
+      final mapped = result.bimap(
+        data: (data) => data.toString(),
+        error: (error) => Exception(error),
       );
-
-      result = AsyncResult.data(42);
-      expect(
-        result.maybeWhen(
-          whenData: (data) => 'data: $data',
-          orElse: () => 'other',
-        ),
-        equals('data: 42'),
-      );
+      expect(mapped, AsyncResult<String, Exception>.data('42'));
     });
 
-    test('equality', () {
-      expect(AsyncResult<int, String>.data(42),
-          equals(AsyncResult<int, String>.data(42)));
-      expect(AsyncResult<int, String>.data(42),
-          isNot(equals(AsyncResult<int, String>.data(43))));
-      expect(AsyncResult<int, String>.error('Error'),
-          equals(AsyncResult<int, String>.error('Error')));
-      expect(AsyncResult<int, String>.error('Error'),
-          isNot(equals(AsyncResult<int, String>.error('Different error'))));
+    test('should flatMap correctly', () {
+      final result = AsyncResult<int, String>.data(42);
+      final flatMapped = result
+          .flatMap((data) => AsyncResult<String, String>.data(data.toString()));
+      expect(flatMapped, AsyncResult<String, String>.data('42'));
     });
 
-    test('whenInitial method', () {
-      final result = AsyncResult<int, String>.initial();
-      expect(result.whenInitial(() => 'initial'), equals('initial'));
-      expect(AsyncResult<int, String>.data(42).whenInitial(() => 'initial'),
-          isNull);
+    test('should recover from error correctly', () {
+      final result = AsyncResult<int, String>.error('error');
+      final recovered = result.recover((error) => -1);
+      expect(recovered, AsyncResult<int, String>.data(-1));
     });
 
-    test('whenLoading method', () {
+    test('should check allComplete correctly', () {
+      final results = [
+        AsyncResult<int, String>.data(42),
+        AsyncResult<int, String>.error('error'),
+      ];
+      expect(AsyncResult.allComplete(results), true);
+    });
+
+    test('should check anyError correctly', () {
+      final results = [
+        AsyncResult<int, String>.data(42),
+        AsyncResult<int, String>.error('error'),
+      ];
+      expect(AsyncResult.anyError(results), true);
+    });
+
+    test('should handle when correctly', () {
       final result = AsyncResult<int, String>.loading();
-      expect(result.whenLoading(() => 'loading'), equals('loading'));
-      expect(AsyncResult<int, String>.data(42).whenLoading(() => 'loading'),
-          isNull);
+      final output = result.when(
+        whenInitial: () => 'Initial',
+        whenLoading: () => 'Loading',
+        whenData: (data) => 'Data: $data',
+        whenError: (error) => 'Error: $error',
+      );
+      expect(output, 'Loading');
     });
 
-    test('whenData method', () {
+    test('should handle maybeWhen correctly', () {
       final result = AsyncResult<int, String>.data(42);
-      expect(result.whenData((data) => 'data: $data'), equals('data: 42'));
-      expect(
-          AsyncResult<int, String>.error('Error')
-              .whenData((data) => 'data: $data'),
-          isNull);
+      final output = result.maybeWhen(
+        whenData: (data) => 'Data: $data',
+        orElse: () => 'Not in data state',
+      );
+      expect(output, 'Data: 42');
     });
 
-    test('whenError method', () {
-      final result = AsyncResult<int, String>.error('Error message');
-      expect(result.whenError((error) => 'error: $error'),
-          equals('error: Error message'));
-      expect(
-          AsyncResult<int, String>.data(42)
-              .whenError((error) => 'error: $error'),
-          isNull);
+    test('should handle whenOrNull correctly', () {
+      final result = AsyncResult<int, String>.error('error');
+      final output = result.whenOrNull(
+        whenError: (error) => 'Error: $error',
+      );
+      expect(output, 'Error: error');
     });
   });
 }

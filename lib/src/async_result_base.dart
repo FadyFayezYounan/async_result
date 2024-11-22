@@ -28,6 +28,16 @@ sealed class AsyncResult<T, E> {
   /// Creates an instance representing an error state.
   const factory AsyncResult.error(E error) = AsyncError<T, E>;
 
+  /// Extension method to check if all AsyncResults in an iterable are completed.
+  static bool allComplete<T, E>(Iterable<AsyncResult<T, E>> results) {
+    return results.every((result) => result.isCompleted);
+  }
+
+  /// Extension method to check if any AsyncResult in an iterable has an error.
+  static bool anyError<T, E>(Iterable<AsyncResult<T, E>> results) {
+    return results.any((result) => result.hasError);
+  }
+
   /// Returns true if this instance represents the initial state.
   bool get isInitial;
 
@@ -39,6 +49,12 @@ sealed class AsyncResult<T, E> {
 
   /// Returns true if this instance contains data.
   bool get hasData;
+
+  /// Returns true if this instance is a successful state.
+  bool get isSuccess => hasData && !hasError;
+
+  /// Returns true if this instance is an error state.
+  bool get isError => hasError && !hasData;
 
   /// Returns true if this instance is in either loading or initial state.
   bool get isLoadingOrInitial;
@@ -108,14 +124,6 @@ sealed class AsyncResult<T, E> {
   /// Executes the given function if the state has an error.
   R? whenError<R>(R Function(E error) whenError);
 
-  /// Maps the current state to a value of type R.
-  R map<R>({
-    required R Function(AsyncInitial<T, E> initial) initial,
-    required R Function(AsyncLoading<T, E> loading) loading,
-    required R Function(AsyncData<T, E> data) data,
-    required R Function(AsyncError<T, E> error) error,
-  });
-
   /// Allows pattern matching on the different states of AsyncResult,
   /// returning null if no matching function is provided.
   ///
@@ -134,40 +142,130 @@ sealed class AsyncResult<T, E> {
     R Function(E error)? whenError,
   });
 
-  /// Maps the current state to a value of type R, returning null
-  /// if no matching function is provided.
+  /// Maps the success value of this AsyncResult to a new value of type R.
+  ///
+  /// If this AsyncResult is in the data state, applies the given mapping function
+  /// to the data value and returns a new AsyncResult with the mapped value.
+  /// Otherwise, returns this AsyncResult unchanged (but with updated generic types).
   ///
   /// Example:
   /// ```dart
-  /// final result = result.mapOrNull(
-  ///   data: (data) => "Data: ${data}",
-  ///   error: (error) => "Error: ${error}",
-  /// );
-  /// print(result ?? "No match");
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final mapped = result.map((i) => i.toString()); // AsyncResult<String, String>
   /// ```
-  R? mapOrNull<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
+  AsyncResult<R, E> map<R>(R Function(T data) mapper);
+
+  /// Maps the error value of this AsyncResult to a new error type F.
+  ///
+  /// If this AsyncResult is in the error state, applies the given mapping function
+  /// to the error value and returns a new AsyncResult with the mapped error.
+  /// Otherwise, returns this AsyncResult unchanged (but with updated generic types).
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.error("error");
+  /// final mapped = result.mapError((e) => Exception(e)); // AsyncResult<int, Exception>
+  /// ```
+  AsyncResult<T, F> mapError<F>(F Function(E error) mapper);
+
+  /// Maps both success and error values simultaneously.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final mapped = result.bimap(
+  ///   data: (i) => i.toString(),
+  ///   error: (e) => Exception(e),
+  /// );
+  /// ```
+  AsyncResult<R, F> bimap<R, F>({
+    required R Function(T data) data,
+    required F Function(E error) error,
   });
 
-  /// Similar to `map`, but allows for a default case with `orElse`.
+  /// Chains another AsyncResult-returning operation only if this instance contains data.
   ///
   /// Example:
   /// ```dart
-  /// result.maybeMap(
-  ///   data: (data) => print("Data: ${data}"),
-  ///   orElse: () => print("Not in data state"),
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final chained = result.flatMap((data) => AsyncResult.data(data.toString()));
+  /// ```
+  AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper);
+
+  /// Recovers from an error state by transforming the error into data.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.error("Not found");
+  /// final recovered = result.recover((error) => -1);
+  /// ```
+  AsyncResult<T, E> recover(T Function(E error) recovery);
+
+  /// Returns true if the data value satisfies the given predicate.
+  ///
+  /// Returns false if this instance is not in the data state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final isPositive = result.any((data) => data > 0); // true
+  /// ```
+  bool any(bool Function(T data) predicate) {
+    return when(
+      whenData: predicate,
+      whenError: (_) => false,
+      whenLoading: () => false,
+      whenInitial: () => false,
+    );
+  }
+
+  /// Creates a new AsyncResult with a transformed error, but only if it matches a condition.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.error("Not found");
+  /// final mapped = result.mapErrorWhere(
+  ///   (e) => e.contains("not"),
+  ///   (e) => "404: $e",
   /// );
   /// ```
-  R maybeMap<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-    required R Function() orElse,
-  });
+  AsyncResult<T, E> mapErrorWhere(
+    bool Function(E error) test,
+    E Function(E error) mapper,
+  ) {
+    return when(
+      whenData: (data) => AsyncResult.data(data),
+      whenError: (error) => AsyncResult.error(
+        test(error) ? mapper(error) : error,
+      ),
+      whenLoading: () => AsyncResult.loading(),
+      whenInitial: () => AsyncResult.initial(),
+    );
+  }
+
+  /// Creates a new AsyncResult with transformed data, but only if it matches a condition.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final mapped = result.mapWhere(
+  ///   (i) => i > 0,
+  ///   (i) => i * 2,
+  /// );
+  /// ```
+  AsyncResult<T, E> mapWhere(
+    bool Function(T data) test,
+    T Function(T data) mapper,
+  ) {
+    return when(
+      whenData: (data) => AsyncResult.data(
+        test(data) ? mapper(data) : data,
+      ),
+      whenError: (error) => AsyncResult.error(error),
+      whenLoading: () => AsyncResult.loading(),
+      whenInitial: () => AsyncResult.initial(),
+    );
+  }
 
   @override
   String toString() => 'AsyncResult()';
@@ -232,15 +330,6 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
   R? whenData<R>(R Function(T data) whenData) => null;
 
   @override
-  R map<R>({
-    required R Function(AsyncInitial<T, E> initial) initial,
-    required R Function(AsyncLoading<T, E> loading) loading,
-    required R Function(AsyncData<T, E> success) data,
-    required R Function(AsyncError<T, E> failure) error,
-  }) =>
-      initial(this);
-
-  @override
   R maybeWhen<R>({
     R Function()? whenInitial,
     R Function()? whenLoading,
@@ -249,9 +338,6 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
     required R Function() orElse,
   }) =>
       whenInitial?.call() ?? orElse();
-
-  @override
-  String toString() => 'AsyncInitial()';
 
   @override
   R? whenOrNull<R>({
@@ -263,23 +349,30 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
       whenInitial?.call();
 
   @override
-  R? mapOrNull<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-  }) =>
-      initial?.call(this);
+  AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
+      AsyncResult<R, E>.initial();
 
   @override
-  R maybeMap<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-    required R Function() orElse,
+  AsyncResult<T, F> mapError<F>(F Function(E error) mapper) =>
+      AsyncResult<T, F>.initial();
+
+  @override
+  AsyncResult<R, F> bimap<R, F>({
+    required R Function(T data) data,
+    required F Function(E error) error,
   }) =>
-      initial?.call(this) ?? orElse();
+      AsyncResult<R, F>.initial();
+
+  @override
+  AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper) =>
+      AsyncResult<R, E>.initial();
+
+  @override
+  AsyncResult<T, E> recover(T Function(E error) recovery) =>
+      AsyncResult<T, E>.initial();
+
+  @override
+  String toString() => 'AsyncInitial()';
 }
 
 /// Represents the loading state of an asynchronous operation.
@@ -341,15 +434,6 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
   R? whenData<R>(R Function(T data) whenData) => null;
 
   @override
-  R map<R>({
-    required R Function(AsyncInitial<T, E> initial) initial,
-    required R Function(AsyncLoading<T, E> loading) loading,
-    required R Function(AsyncData<T, E> success) data,
-    required R Function(AsyncError<T, E> failure) error,
-  }) =>
-      loading(this);
-
-  @override
   R maybeWhen<R>({
     R Function()? whenInitial,
     R Function()? whenLoading,
@@ -358,9 +442,6 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
     required R Function() orElse,
   }) =>
       whenLoading?.call() ?? orElse();
-
-  @override
-  String toString() => 'AsyncLoading()';
 
   @override
   R? whenOrNull<R>({
@@ -372,23 +453,30 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
       whenLoading?.call();
 
   @override
-  R? mapOrNull<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-  }) =>
-      loading?.call(this);
+  AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
+      AsyncResult<R, E>.loading();
 
   @override
-  R maybeMap<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-    required R Function() orElse,
+  AsyncResult<T, F> mapError<F>(F Function(E error) mapper) =>
+      AsyncResult<T, F>.loading();
+
+  @override
+  AsyncResult<R, F> bimap<R, F>({
+    required R Function(T data) data,
+    required F Function(E error) error,
   }) =>
-      loading?.call(this) ?? orElse();
+      AsyncResult<R, F>.loading();
+
+  @override
+  AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper) =>
+      AsyncResult<R, E>.loading();
+
+  @override
+  AsyncResult<T, E> recover(T Function(E error) recovery) =>
+      AsyncResult<T, E>.loading();
+
+  @override
+  String toString() => 'AsyncLoading()';
 }
 
 /// Represents a successful state of an asynchronous operation with data.
@@ -453,13 +541,35 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   R? whenData<R>(R Function(T data) whenData) => whenData(_data);
 
   @override
-  R map<R>({
-    required R Function(AsyncInitial<T, E> initial) initial,
-    required R Function(AsyncLoading<T, E> loading) loading,
-    required R Function(AsyncData<T, E> success) data,
-    required R Function(AsyncError<T, E> failure) error,
+  R? whenOrNull<R>({
+    R Function()? whenInitial,
+    R Function()? whenLoading,
+    R Function(T data)? whenData,
+    R Function(E error)? whenError,
   }) =>
-      data(this);
+      whenData?.call(_data);
+
+  @override
+  AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
+      AsyncResult<R, E>.data(mapper(_data));
+
+  @override
+  AsyncResult<T, F> mapError<F>(F Function(E error) mapper) =>
+      AsyncResult<T, F>.data(_data);
+
+  @override
+  AsyncResult<R, F> bimap<R, F>({
+    required R Function(T data) data,
+    required F Function(E error) error,
+  }) =>
+      AsyncResult<R, F>.data(data(_data));
+
+  @override
+  AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper) =>
+      mapper(_data);
+  @override
+  AsyncResult<T, E> recover(T Function(E error) recovery) =>
+      AsyncResult<T, E>.data(_data);
 
   @override
   R maybeWhen<R>({
@@ -483,34 +593,6 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   String toString() => 'AsyncData($_data)';
-
-  @override
-  R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
-  }) =>
-      whenData?.call(_data);
-
-  @override
-  R? mapOrNull<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-  }) =>
-      data?.call(this);
-
-  @override
-  R maybeMap<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-    required R Function() orElse,
-  }) =>
-      data?.call(this) ?? orElse();
 }
 
 /// Represents an error state of an asynchronous operation.
@@ -575,15 +657,6 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
   R? whenData<R>(R Function(T data) whenData) => null;
 
   @override
-  R map<R>({
-    required R Function(AsyncInitial<T, E> initial) initial,
-    required R Function(AsyncLoading<T, E> loading) loading,
-    required R Function(AsyncData<T, E> success) data,
-    required R Function(AsyncError<T, E> failure) error,
-  }) =>
-      error(this);
-
-  @override
   R maybeWhen<R>({
     R Function()? whenInitial,
     R Function()? whenLoading,
@@ -592,6 +665,38 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
     required R Function() orElse,
   }) =>
       whenError?.call(_error) ?? orElse();
+
+  @override
+  R? whenOrNull<R>({
+    R Function()? whenInitial,
+    R Function()? whenLoading,
+    R Function(T data)? whenData,
+    R Function(E error)? whenError,
+  }) =>
+      whenError?.call(_error);
+
+  @override
+  AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
+      AsyncResult<R, E>.error(_error);
+
+  @override
+  AsyncResult<T, F> mapError<F>(F Function(E error) mapper) =>
+      AsyncResult<T, F>.error(mapper(_error));
+
+  @override
+  AsyncResult<R, F> bimap<R, F>({
+    required R Function(T data) data,
+    required F Function(E error) error,
+  }) =>
+      AsyncResult<R, F>.error(error(_error));
+
+  @override
+  AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper) =>
+      AsyncResult<R, E>.error(_error);
+
+  @override
+  AsyncResult<T, E> recover(T Function(E error) recovery) =>
+      AsyncResult<T, E>.data(recovery(_error));
 
   @override
   bool operator ==(Object other) =>
@@ -605,32 +710,4 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
 
   @override
   String toString() => 'AsyncError($_error)';
-
-  @override
-  R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
-  }) =>
-      whenError?.call(_error);
-
-  @override
-  R? mapOrNull<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-  }) =>
-      error?.call(this);
-
-  @override
-  R maybeMap<R>({
-    R Function(AsyncInitial<T, E> initial)? initial,
-    R Function(AsyncLoading<T, E> loading)? loading,
-    R Function(AsyncData<T, E> data)? data,
-    R Function(AsyncError<T, E> error)? error,
-    required R Function() orElse,
-  }) =>
-      error?.call(this) ?? orElse();
 }
