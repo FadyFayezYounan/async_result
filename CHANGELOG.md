@@ -1,3 +1,7 @@
+## 1.0.5
+
+- Add new static methods.
+
 ## 1.0.4
 
 - Add new methods and update readme file.
