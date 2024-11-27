@@ -28,14 +28,82 @@ sealed class AsyncResult<T, E> {
   /// Creates an instance representing an error state.
   const factory AsyncResult.error(E error) = AsyncError<T, E>;
 
-  /// Extension method to check if all AsyncResults in an iterable are completed.
-  static bool allComplete<T, E>(Iterable<AsyncResult<T, E>> results) {
-    return results.every((result) => result.isCompleted);
+  /// Checks if all `AsyncResult` instances in the given iterable are completed (success or error).
+  ///
+  /// This method iterates through the provided iterable of `AsyncResult`
+  /// instances and returns `true` if every instance has completed, otherwise
+  /// returns `false`.
+  ///
+  /// - Parameter iterable: An iterable collection of `AsyncResult` instances.
+  /// - Returns: A boolean value indicating whether all `AsyncResult` instances
+  ///   in the iterable are completed.
+  static bool allComplete<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.every((result) => result.isCompleted);
   }
 
-  /// Extension method to check if any AsyncResult in an iterable has an error.
-  static bool anyError<T, E>(Iterable<AsyncResult<T, E>> results) {
-    return results.any((result) => result.hasError);
+  /// Checks if all elements in the given iterable are successful.
+  ///
+  /// This method takes an iterable of `AsyncResult` objects and returns `true`
+  /// if every element in the iterable has a successful result (`isSuccess` is `true`).
+  ///
+  static bool allSuccess<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.every((result) => result.isSuccess);
+  }
+
+  /// Checks if all elements in the given iterable are in an error state.
+  ///
+  /// This method iterates through the provided [iterable] of [AsyncResult] objects
+  /// and returns `true` if every element is an error. Otherwise, it returns `false`.
+  ///
+  /// - Parameter iterable: An iterable collection of [AsyncResult] objects.
+  /// - Returns: A boolean value indicating whether all elements are errors.
+  static bool allError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.every((result) => result.isError);
+  }
+
+  /// Checks if any [AsyncResult] in the given iterable has an error.
+  ///
+  /// This method iterates through the provided [iterable] of [AsyncResult]
+  /// objects and returns `true` if at least one of them has an error.
+  ///
+  /// - [iterable]: An iterable collection of [AsyncResult] objects to check.
+  ///
+  /// Returns `true` if any [AsyncResult] in the iterable has an error, otherwise `false`.
+  static bool anyError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.any((result) => result.hasError);
+  }
+
+  /// Checks if any of the `AsyncResult` objects in the given iterable are in a loading state.
+  ///
+  /// This method iterates through the provided iterable of `AsyncResult` objects
+  /// and returns `true` if at least one of the objects is currently loading.
+  ///
+  /// - Parameter iterable: An iterable collection of `AsyncResult` objects.
+  /// - Returns: `true` if any `AsyncResult` in the iterable is loading, otherwise `false`.
+  static bool anyLoading<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.any((result) => result.isLoading);
+  }
+
+  /// Checks if any of the `AsyncResult` instances in the given iterable are completed (success or error).
+  ///
+  /// This method iterates through the provided iterable and returns `true` if
+  /// at least one `AsyncResult` has completed, otherwise it returns `false`.
+  ///
+  /// - Parameter iterable: An iterable collection of `AsyncResult` instances.
+  /// - Returns: A boolean value indicating whether any `AsyncResult` in the iterable is completed.
+  static bool anyComplete<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.any((result) => result.isCompleted);
+  }
+
+  /// Checks if any of the [AsyncResult] instances in the given [iterable] is successful.
+  ///
+  /// Returns `true` if at least one [AsyncResult] in the [iterable] has a success state,
+  /// otherwise returns `false`.
+  ///
+  /// - Parameter iterable: An [Iterable] of [AsyncResult] instances to check.
+  /// - Returns: A [bool] indicating whether any [AsyncResult] in the [iterable] is successful.
+  static bool anySuccess<T, E>(Iterable<AsyncResult<T, E>> iterable) {
+    return iterable.any((result) => result.isSuccess);
   }
 
   /// Returns an iterable of all data from the provided list of AsyncResults.

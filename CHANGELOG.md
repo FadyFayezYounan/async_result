@@ -1,3 +1,7 @@
+## 1.0.6
+
+- Add more static methods such as `anySuccess`, `anyLoading`, `anyCompeted` and `anyError`.
+
 ## 1.0.5
 
 - Add new static methods.
