@@ -17,7 +17,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  async_result: ^1.0.4
+  async_result: ^1.0.6
 ```
 
 ## Overview

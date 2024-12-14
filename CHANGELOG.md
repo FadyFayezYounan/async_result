@@ -1,3 +1,7 @@
+## 1.0.7
+
+- Add more static methods such as `zip2`, `zip3`, `zipMultiple`.
+
 ## 1.0.6
 
 - Add more static methods such as `anySuccess`, `anyLoading`, `anyCompeted` and `anyError`.
