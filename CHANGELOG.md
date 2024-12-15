@@ -1,3 +1,7 @@
+## 1.0.8
+
+- Add more static methods such as `zip4` and `zip5`.
+
 ## 1.0.7
 
 - Add more static methods such as `zip2`, `zip3`, `zipMultiple`.

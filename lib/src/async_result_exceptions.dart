@@ -10,15 +10,14 @@
 /// Example:
 /// ```dart
 /// final result = AsyncResult<String, Error>.failure(Error());
-/// result.dataOrThrow; // Throws AsyncResultDataNoFoundedExceptions
+/// result.dataOrThrow; // Throws AsyncResultDataNotFoundException
 /// ```
 ///
 /// To avoid this exception, either:
 /// * Check [isSuccess] before accessing [dataOrThrow]
 /// * Use [dataOrNull] which returns null instead of throwing
-final class AsyncResultDataNoFoundedExceptions<S, E> implements Exception {
-  const AsyncResultDataNoFoundedExceptions();
-
+final class AsyncResultDataNotFoundException<S, E> implements Exception {
+  const AsyncResultDataNotFoundException();
   @override
   String toString() {
     return '''
@@ -41,14 +40,14 @@ final class AsyncResultDataNoFoundedExceptions<S, E> implements Exception {
 /// Example:
 /// ```dart
 /// final result = AsyncResult<String, Error>.success('data');
-/// result.errorOrThrow; // Throws AsyncResultErrorNoFoundedExceptions
+/// result.errorOrThrow; // Throws AsyncResultErrorNotFoundException
 /// ```
 ///
 /// To avoid this exception, either:
 /// * Check [isFailure] before accessing [errorOrThrow]
 /// * Use [errorOrNull] which returns null instead of throwing
-final class AsyncResultErrorNoFoundedExceptions<S, E> implements Exception {
-  const AsyncResultErrorNoFoundedExceptions();
+final class AsyncResultErrorNotFoundException<S, E> implements Exception {
+  const AsyncResultErrorNotFoundException();
 
   @override
   String toString() {

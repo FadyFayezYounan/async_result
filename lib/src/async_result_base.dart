@@ -289,6 +289,170 @@ sealed class AsyncResult<T, E> {
     return AsyncResult.initial();
   }
 
+  /// Combines four [AsyncResult] instances into a single [AsyncResult] containing a record of all results.
+  ///
+  /// The combined result follows these rules:
+  /// * Returns [AsyncResult.loading] if any result is loading
+  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
+  /// * Returns [AsyncResult.data] with a record containing the data of all four results if all have data
+  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  ///
+  /// ### Example
+  /// ```dart
+  /// final result1 = AsyncResult.data(1);
+  /// final result2 = AsyncResult.data("hello");
+  /// final result3 = AsyncResult.data(true);
+  /// final result4 = AsyncResult.data(42.0);
+  /// final combined = AsyncResult.zip4(result1, result2, result3, result4);
+  /// combined.when(
+  ///   whenInitial: () { /* handle initial state */ },
+  ///   whenLoading: () { /* handle loading state */ },
+  ///   whenData: (data) {
+  ///     print('Combined: ${data.first}, ${data.second}, ${data.third}, ${data.fourth}');
+  ///   },
+  ///   whenError: (error) { /* handle error state */ },
+  /// );
+  /// ```
+  ///
+  /// ### Parameters
+  /// * [result1] - The first [AsyncResult] to combine
+  /// * [result2] - The second [AsyncResult] to combine
+  /// * [result3] - The third [AsyncResult] to combine
+  /// * [result4] - The fourth [AsyncResult] to combine
+  ///
+  /// ### Type Parameters
+  /// * [T] - The type of the first result's data
+  /// * [U] - The type of the second result's data
+  /// * [V] - The type of the third result's data
+  /// * [W] - The type of the fourth result's data
+  /// * [E] - The type of possible errors (must be the same for all results)
+  ///
+  /// ### Returns
+  /// An [AsyncResult] containing a record with [first], [second], [third] and [fourth] fields if successful
+  static AsyncResult<({T first, U second, V third, W fourth}), E>
+      zip4<T, U, V, W, E>(
+    AsyncResult<T, E> result1,
+    AsyncResult<U, E> result2,
+    AsyncResult<V, E> result3,
+    AsyncResult<W, E> result4,
+  ) {
+    // Check error state
+    if (result1.isError) return AsyncResult.error(result1.errorOrThrow);
+    if (result2.isError) return AsyncResult.error(result2.errorOrThrow);
+    if (result3.isError) return AsyncResult.error(result3.errorOrThrow);
+    if (result4.isError) return AsyncResult.error(result4.errorOrThrow);
+
+    // Check loading state first
+    if (result1.isLoading ||
+        result2.isLoading ||
+        result3.isLoading ||
+        result4.isLoading) {
+      return AsyncResult.loading();
+    }
+
+    // Check data state
+    if (result1.hasData &&
+        result2.hasData &&
+        result3.hasData &&
+        result4.hasData) {
+      return AsyncResult.data((
+        first: result1.dataOrThrow,
+        second: result2.dataOrThrow,
+        third: result3.dataOrThrow,
+        fourth: result4.dataOrThrow
+      ));
+    }
+
+    // If none of the above, return initial
+    return AsyncResult.initial();
+  }
+
+  /// Combines five [AsyncResult] instances into a single [AsyncResult] containing a record of all results.
+  ///
+  /// The combined result follows these rules:
+  /// * Returns [AsyncResult.loading] if any result is loading
+  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
+  /// * Returns [AsyncResult.data] with a record containing the data of all five results if all have data
+  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  ///
+  /// ### Example
+  /// ```dart
+  /// final result1 = AsyncResult.data(1);
+  /// final result2 = AsyncResult.data("hello");
+  /// final result3 = AsyncResult.data(true);
+  /// final result4 = AsyncResult.data(42.0);
+  /// final result5 = AsyncResult.data([1,2,3]);
+  /// final combined = AsyncResult.zip5(result1, result2, result3, result4, result5);
+  /// combined.when(
+  ///   whenInitial: () { /* handle initial state */ },
+  ///   whenLoading: () { /* handle loading state */ },
+  ///   whenData: (data) {
+  ///     print('Combined: ${data.first}, ${data.second}, ${data.third}, ${data.fourth}, ${data.fifth}');
+  ///   },
+  ///   whenError: (error) { /* handle error state */ },
+  /// );
+  /// ```
+  ///
+  /// ### Parameters
+  /// * [result1] - The first [AsyncResult] to combine
+  /// * [result2] - The second [AsyncResult] to combine
+  /// * [result3] - The third [AsyncResult] to combine
+  /// * [result4] - The fourth [AsyncResult] to combine
+  /// * [result5] - The fifth [AsyncResult] to combine
+  ///
+  /// ### Type Parameters
+  /// * [T] - The type of the first result's data
+  /// * [U] - The type of the second result's data
+  /// * [V] - The type of the third result's data
+  /// * [W] - The type of the fourth result's data
+  /// * [X] - The type of the fifth result's data
+  /// * [E] - The type of possible errors (must be the same for all results)
+  ///
+  /// ### Returns
+  /// An [AsyncResult] containing a record with [first], [second], [third], [fourth] and [fifth] fields if successful
+  static AsyncResult<({T first, U second, V third, W fourth, X fifth}), E>
+      zip5<T, U, V, W, X, E>(
+    AsyncResult<T, E> result1,
+    AsyncResult<U, E> result2,
+    AsyncResult<V, E> result3,
+    AsyncResult<W, E> result4,
+    AsyncResult<X, E> result5,
+  ) {
+    // Check error state
+    if (result1.isError) return AsyncResult.error(result1.errorOrThrow);
+    if (result2.isError) return AsyncResult.error(result2.errorOrThrow);
+    if (result3.isError) return AsyncResult.error(result3.errorOrThrow);
+    if (result4.isError) return AsyncResult.error(result4.errorOrThrow);
+    if (result5.isError) return AsyncResult.error(result5.errorOrThrow);
+
+    // Check loading state first
+    if (result1.isLoading ||
+        result2.isLoading ||
+        result3.isLoading ||
+        result4.isLoading ||
+        result5.isLoading) {
+      return AsyncResult.loading();
+    }
+
+    // Check data state
+    if (result1.hasData &&
+        result2.hasData &&
+        result3.hasData &&
+        result4.hasData &&
+        result5.hasData) {
+      return AsyncResult.data((
+        first: result1.dataOrThrow,
+        second: result2.dataOrThrow,
+        third: result3.dataOrThrow,
+        fourth: result4.dataOrThrow,
+        fifth: result5.dataOrThrow
+      ));
+    }
+
+    // If none of the above, return initial
+    return AsyncResult.initial();
+  }
+
   /// Combines multiple [AsyncResult] instances into a single [AsyncResult] containing a list of their values.
   ///
   /// The resulting [AsyncResult] follows these rules:
@@ -602,13 +766,13 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNoFoundedExceptions();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException();
 
   @override
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNoFoundedExceptions();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
 
   @override
   T getDataOrElse(T defaultValue) => defaultValue;
@@ -712,13 +876,13 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNoFoundedExceptions();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException();
 
   @override
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNoFoundedExceptions();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
 
   @override
   T getDataOrElse(T defaultValue) => defaultValue;
@@ -831,7 +995,7 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNoFoundedExceptions();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
 
   @override
   T getDataOrElse(T defaultValue) => _data;
@@ -947,7 +1111,7 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNoFoundedExceptions();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException();
 
   @override
   E? get errorOrNull => _error;
