@@ -1,3 +1,7 @@
+## 1.0.9
+
+- Marked `hasData` and `hasError` as deprecated. Use `isSuccess` and `isError` instead.
+
 ## 1.0.8
 
 - Add more static methods such as `zip4` and `zip5`.

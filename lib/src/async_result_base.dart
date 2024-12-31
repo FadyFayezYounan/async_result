@@ -72,7 +72,7 @@ sealed class AsyncResult<T, E> {
   ///
   /// Returns `true` if any [AsyncResult] in the iterable has an error, otherwise `false`.
   static bool anyError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
-    return iterable.any((result) => result.hasError);
+    return iterable.any((result) => result.isError);
   }
 
   /// Checks if any of the `AsyncResult` objects in the given iterable are in a loading state.
@@ -113,7 +113,7 @@ sealed class AsyncResult<T, E> {
       Iterable<AsyncResult<T, E>> iterable) sync* {
     for (var result in iterable) {
       if (result.isSuccess) {
-        yield result.dataOrNull!;
+        yield result.dataOrThrow;
       }
     }
   }
@@ -123,7 +123,7 @@ sealed class AsyncResult<T, E> {
       Iterable<AsyncResult<T, E>> iterable) sync* {
     for (var result in iterable) {
       if (result.isError) {
-        yield result.errorOrNull!;
+        yield result.errorOrThrow;
       }
     }
   }
@@ -215,7 +215,7 @@ sealed class AsyncResult<T, E> {
     }
 
     // Check data state
-    if (result1.hasData && result2.hasData) {
+    if (result1.isSuccess && result2.isSuccess) {
       return AsyncResult.data(
         (first: result1.dataOrThrow, second: result2.dataOrThrow),
       );
@@ -277,7 +277,7 @@ sealed class AsyncResult<T, E> {
       return AsyncResult.loading();
     }
     // Check data state
-    if (result1.hasData && result2.hasData && result3.hasData) {
+    if (result1.isSuccess && result2.isSuccess && result3.isSuccess) {
       return AsyncResult.data((
         first: result1.dataOrThrow,
         second: result2.dataOrThrow,
@@ -351,10 +351,10 @@ sealed class AsyncResult<T, E> {
     }
 
     // Check data state
-    if (result1.hasData &&
-        result2.hasData &&
-        result3.hasData &&
-        result4.hasData) {
+    if (result1.isSuccess &&
+        result2.isSuccess &&
+        result3.isSuccess &&
+        result4.isSuccess) {
       return AsyncResult.data((
         first: result1.dataOrThrow,
         second: result2.dataOrThrow,
@@ -435,11 +435,11 @@ sealed class AsyncResult<T, E> {
     }
 
     // Check data state
-    if (result1.hasData &&
-        result2.hasData &&
-        result3.hasData &&
-        result4.hasData &&
-        result5.hasData) {
+    if (result1.isSuccess &&
+        result2.isSuccess &&
+        result3.isSuccess &&
+        result4.isSuccess &&
+        result5.isSuccess) {
       return AsyncResult.data((
         first: result1.dataOrThrow,
         second: result2.dataOrThrow,
@@ -486,7 +486,7 @@ sealed class AsyncResult<T, E> {
     }
 
     // Check data state
-    if (results.every((result) => result.hasData)) {
+    if (results.every((result) => result.isSuccess)) {
       return AsyncResult.data(
           results.map((result) => result.dataOrNull).toList());
     }
@@ -502,16 +502,18 @@ sealed class AsyncResult<T, E> {
   bool get isLoading;
 
   /// Returns true if this instance represents an error state.
+  @Deprecated('Please use isError instead.')
   bool get hasError;
 
-  /// Returns true if this instance contains data.
+  /// Returns true if this instance contains data
+  @Deprecated('Please use isSuccess instead.')
   bool get hasData;
 
   /// Returns true if this instance is a successful state.
-  bool get isSuccess => hasData && !hasError;
+  bool get isSuccess;
 
   /// Returns true if this instance is an error state.
-  bool get isError => hasError && !hasData;
+  bool get isError;
 
   /// Returns true if this instance is in either loading or initial state.
   bool get isLoadingOrInitial;
@@ -751,6 +753,12 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
   bool get isLoading => false;
 
   @override
+  bool get isError => false;
+
+  @override
+  bool get isSuccess => false;
+
+  @override
   bool get hasError => false;
 
   @override
@@ -859,6 +867,12 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
 
   @override
   bool get isLoading => true;
+
+  @override
+  bool get isError => false;
+
+  @override
+  bool get isSuccess => false;
 
   @override
   bool get hasError => false;
@@ -972,6 +986,12 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   bool get isLoading => false;
+
+  @override
+  bool get isError => false;
+
+  @override
+  bool get isSuccess => true;
 
   @override
   bool get hasError => false;
@@ -1094,6 +1114,12 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
 
   @override
   bool get isLoading => false;
+
+  @override
+  bool get isError => true;
+
+  @override
+  bool get isSuccess => false;
 
   @override
   bool get hasError => true;
