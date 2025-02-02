@@ -1,3 +1,7 @@
+## 1.1.1
+
+- remove deprecated fields from equality check
+
 ## 1.1.0
 
 - add value equality for Result class
