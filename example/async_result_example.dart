@@ -3,108 +3,140 @@ import 'dart:math';
 
 import 'package:async_result/async_result.dart';
 
-// Usage examples
+// Sample domain models
+class User {
+  final String id;
+  final String name;
+  User({required this.id, required this.name});
+}
+
+class Post {
+  final String id;
+  final String title;
+  Post({required this.id, required this.title});
+}
+
+// Sample repository
+class Repository {
+  final _random = Random();
+
+  // Simulates API call to fetch user
+  Future<AsyncResult<User, String>> fetchUser(String id) async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (_random.nextBool()) {
+      return AsyncResult.data(User(id: id, name: 'John Doe'));
+    } else {
+      return AsyncResult.error('Failed to fetch user');
+    }
+  }
+
+  // Simulates API call to fetch posts
+  Future<AsyncResult<List<Post>, String>> fetchUserPosts(String userId) async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (_random.nextBool()) {
+      return AsyncResult.data([
+        Post(id: '1', title: 'First Post'),
+        Post(id: '2', title: 'Second Post'),
+      ]);
+    } else {
+      return AsyncResult.error('Failed to fetch posts');
+    }
+  }
+}
+
+// Example usage
 void main() async {
-  // Using Example 1
-  print('Fetching todos...');
-  final todosResult = await fetchTodos();
-  todosResult.when(
-    whenInitial: () => print('Initial state (unexpected)'),
-    whenLoading: () => print('Loading todos...'),
-    whenData: (todos) => print('Fetched ${todos.length} todos: $todos'),
-    whenError: (error) => print('Error fetching todos: $error'),
-  );
+  final repository = Repository();
 
-  // Using Example 2
-  print('\nPerforming computation...');
-  final computationResult = await simulateComputation();
-  computationResult.when(
-    whenInitial: () => print('Initial state (unexpected)'),
-    whenLoading: () => print('Computing...'),
-    whenData: (result) => print('Computation result: $result'),
-    whenError: (error) => print('Computation error: $error'),
-  );
+  // Basic usage example
+  print('\n--- Basic Usage Example ---');
+  await basicExample(repository);
 
-  // Using Example 3
-  print('\nProcessing data...');
-  final initialResult = AsyncResult<int, String>.data(10);
-  final processedResult = await processData(initialResult);
-  processedResult.when(
-    whenInitial: () => print('Initial state (unexpected)'),
-    whenLoading: () => print('Processing...'),
-    whenData: (result) => print('Processed result: $result'),
-    whenError: (error) => print('Processing error: $error'),
-  );
+  // Error handling example
+  print('\n--- Error Handling Example ---');
+  await errorHandlingExample(repository);
 
-  // Using Example 5
-  print('\nCombining results...');
-  final result1 = AsyncResult<int, String>.data(42);
-  final result2 = AsyncResult<String, String>.data('Hello');
-  final combinedResult = await combineResults(result1, result2);
-  combinedResult.when(
-    whenInitial: () => print('Initial state (unexpected)'),
-    whenLoading: () => print('Combining...'),
-    whenData: (result) => print(result),
-    whenError: (error) => print('Combining error: $error'),
-  );
+  // Pattern matching example
+  print('\n--- Pattern Matching Example ---');
+  await patternMatchingExample(repository);
+
+  // Transformation example
+  print('\n--- Transformation Example ---');
+  await transformationExample(repository);
 }
 
-// Example 1: Simulating data fetch from an API
-Future<AsyncResult<List<String>, Exception>> fetchTodos() async {
-  // Simulate network delay
-  await Future.delayed(Duration(seconds: 1));
+Future<void> basicExample(Repository repository) async {
+  final result = await repository.fetchUser('user1');
 
-  // Simulate success or failure randomly
-  final random = Random();
-  if (random.nextBool()) {
-    // Simulate successful response
-    final todos = List.generate(5, (index) => 'Todo ${index + 1}');
-    return AsyncResult.data(todos);
-  } else {
-    // Simulate error
-    return AsyncResult.error(Exception('Failed to load todos'));
+  if (result.isSuccess) {
+    print('User found: ${result.dataOrNull?.name}');
+  } else if (result.isError) {
+    print('Error: ${result.errorOrNull}');
   }
 }
 
-// Example 2: Simulating a long-running computation
-Future<AsyncResult<int, String>> simulateComputation() async {
-  try {
-    await Future.delayed(Duration(seconds: 2)); // Simulate work
-    final result =
-        List.generate(1000000, (index) => index).reduce((a, b) => a + b);
-    return AsyncResult.data(result);
-  } catch (e) {
-    return AsyncResult.error('Computation failed: $e');
-  }
+Future<void> errorHandlingExample(Repository repository) async {
+  final result = await repository.fetchUser('user1');
+
+  // Using recovery
+  final recovered =
+      result.recover((error) => User(id: '0', name: 'Guest User'));
+  print('User: ${recovered.dataOrNull?.name}');
+
+  // Safe data access
+  final username = result.dataOrNull?.name ?? 'Unknown';
+  print('Username: $username');
 }
 
-// Example 3: Chaining AsyncResult operations
-Future<AsyncResult<double, String>> processData(
-    AsyncResult<int, String> input) async {
-  return input.when(
-    whenInitial: () => AsyncResult.error('Unexpected initial state'),
-    whenLoading: () => AsyncResult.error('Unexpected loading state'),
-    whenData: (data) async {
-      await Future.delayed(Duration(milliseconds: 500)); // Simulate processing
-      return AsyncResult.data(data / 2.0);
-    },
-    whenError: (error) => AsyncResult.error('Processing failed: $error'),
+Future<void> patternMatchingExample(Repository repository) async {
+  final result = await repository.fetchUser('user1');
+
+  // Complete pattern matching
+  result.when(
+    whenInitial: () => print('Initial state'),
+    whenLoading: () => print('Loading...'),
+    whenData: (user) => print('User: ${user.name}'),
+    whenError: (error) => print('Error: $error'),
   );
+
+  // Partial pattern matching with default case
+  result.maybeWhen(
+    whenData: (user) => print('Found user: ${user.name}'),
+    orElse: () => print('User not available'),
+  );
+
+  // Optional pattern matching
+  final message = result.whenOrNull(
+    whenData: (user) => 'User: ${user.name}',
+    whenError: (error) => 'Error: $error',
+  );
+  print(message ?? 'No matching state');
 }
 
-// Example 5: Combining multiple AsyncResults
-Future<AsyncResult<String, String>> combineResults(
-    AsyncResult<int, String> result1,
-    AsyncResult<String, String> result2) async {
-  if (result1.hasError) return AsyncResult.error(result1.whenError((e) => e)!);
-  if (result2.hasError) return AsyncResult.error(result2.whenError((e) => e)!);
+Future<void> transformationExample(Repository repository) async {
+  final result = await repository.fetchUser('user1');
 
-  final value1 = result1.dataOrNull;
-  final value2 = result2.dataOrNull;
+  // Transform success data
+  final transformed = result.map((user) => user.name.toUpperCase());
+  print('Transformed data: ${transformed.dataOrNull}');
 
-  if (value1 != null && value2 != null) {
-    return AsyncResult.data('Combined: $value1 and $value2');
-  } else {
-    return AsyncResult.error('One or both results are null');
-  }
+  // Transform error
+  final mappedError = result.mapError((error) => 'ERROR: $error');
+  print('Mapped error: ${mappedError.errorOrNull}');
+
+  // Transform both success and error
+  final bimapped = result.bimap(
+    data: (user) => user.name.length,
+    error: (error) => int.tryParse(error) ?? -1,
+  );
+  print('Bimapped result: ${bimapped.dataOrNull ?? bimapped.errorOrNull}');
+
+  // Conditional transformation
+  final conditional = result.mapWhere(
+    (user) => user.name.startsWith('J'),
+    (user) => User(id: user.id, name: 'Mr. ${user.name}'),
+  );
+  print('Conditional: ${conditional.dataOrNull?.name}');
 }

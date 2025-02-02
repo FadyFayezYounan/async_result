@@ -739,6 +739,40 @@ sealed class AsyncResult<T, E> {
   }
 
   @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is AsyncResult<T, E> &&
+        other.isInitial == isInitial &&
+        other.isLoading == isLoading &&
+        other.isError == isError &&
+        other.isSuccess == isSuccess &&
+        other.hasError == hasError &&
+        other.hasData == hasData &&
+        other.isLoadingOrInitial == isLoadingOrInitial &&
+        other.isDateOrError == isDateOrError &&
+        other.isCompleted == isCompleted &&
+        other.dataOrNull == dataOrNull &&
+        other.errorOrNull == errorOrNull;
+  }
+
+  @override
+  // TODO: implement hashCode
+  int get hashCode => Object.hashAll([
+        isInitial,
+        isLoading,
+        isError,
+        isSuccess,
+        hasError,
+        hasData,
+        isLoadingOrInitial,
+        isDateOrError,
+        isCompleted,
+        dataOrNull,
+        errorOrNull,
+      ]);
+
+  @override
   String toString() => 'AsyncResult()';
 }
 
@@ -1003,7 +1037,7 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   bool get isDateOrError => true;
 
   @override
-  bool get hasData => _data != null;
+  bool get hasData => true;
 
   @override
   T? get dataOrNull => _data;

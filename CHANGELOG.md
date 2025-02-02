@@ -1,3 +1,7 @@
+## 1.1.0
+
+- add value equality for Result class
+
 ## 1.0.9
 
 - Marked `hasData` and `hasError` as deprecated. Use `isSuccess` and `isError` instead.
