@@ -9,19 +9,19 @@
 ///
 /// Example:
 /// ```dart
-/// final result = AsyncResult<String, Error>.failure(Error());
+/// final result = AsyncResult<String, Error>.error(Error());
 /// result.dataOrThrow; // Throws AsyncResultDataNotFoundException
 /// ```
 ///
 /// To avoid this exception, either:
 /// * Check [isSuccess] before accessing [dataOrThrow]
 /// * Use [dataOrNull] which returns null instead of throwing
-final class AsyncResultDataNotFoundException<S, E> implements Exception {
+final class AsyncResultDataNotFoundException<T, E> implements Exception {
   const AsyncResultDataNotFoundException();
   @override
   String toString() {
     return '''
-      Tried to get the success value of [$S], but none was found. 
+      Tried to get the success value of [$T], but none was found. 
       Make sure you're checking for `isSuccess` before trying to get it through
       `dataOrThrow`. You can also use `dataOrNull` if you're unsure.
     ''';
@@ -31,7 +31,7 @@ final class AsyncResultDataNotFoundException<S, E> implements Exception {
 /// An exception thrown when attempting to access error data that doesn't exist in an [AsyncResult].
 ///
 /// This exception is typically thrown when calling [errorOrThrow] on an [AsyncResult]
-/// that doesn't contain error data (i.e., when [isFailure] is false).
+/// that doesn't contain error data (i.e., when [isError] is false).
 ///
 /// Generic Parameters:
 /// * [S] - The type of success data that could be present instead
@@ -39,14 +39,14 @@ final class AsyncResultDataNotFoundException<S, E> implements Exception {
 ///
 /// Example:
 /// ```dart
-/// final result = AsyncResult<String, Error>.success('data');
+/// final result = AsyncResult<String, Error>.data('data');
 /// result.errorOrThrow; // Throws AsyncResultErrorNotFoundException
 /// ```
 ///
 /// To avoid this exception, either:
-/// * Check [isFailure] before accessing [errorOrThrow]
+/// * Check [isError] before accessing [errorOrThrow]
 /// * Use [errorOrNull] which returns null instead of throwing
-final class AsyncResultErrorNotFoundException<S, E> implements Exception {
+final class AsyncResultErrorNotFoundException<T, E> implements Exception {
   const AsyncResultErrorNotFoundException();
 
   @override

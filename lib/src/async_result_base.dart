@@ -1,114 +1,243 @@
 import 'async_result_exceptions.dart';
 
+/// {@template async_result}
+/// A sealed class representing the different states of an asynchronous operation.
+///
+/// [AsyncResult] provides a type-safe way to handle asynchronous operations that can
+/// be in one of four states:
+/// - [AsyncInitial]: The operation hasn't started yet
+/// - [AsyncLoading]: The operation is in progress
+/// - [AsyncData]: The operation completed successfully with data
+/// - [AsyncError]: The operation failed with an error
+///
+/// Generic Parameters:
+/// * [T] - The type of data when the operation succeeds
+/// * [E] - The type of error when the operation fails
+///
+/// Example:
+/// ```dart
+/// AsyncResult<String, Exception> fetchUser() async {
+///   try {
+///     final user = await userRepository.getUser();
+///     return AsyncResult.data(user);
+///   } catch (e) {
+///     return AsyncResult.error(e as Exception);
+///   }
+/// }
+///
+/// final result = await fetchUser();
+/// result.when(
+///   initial: () => print('Not started'),
+///   loading: () => print('Loading...'),
+///   data: (user) => print('User: $user'),
+///   error: (error) => print('Error: $error'),
+/// );
+/// ```
+///{@endtemplate}
 sealed class AsyncResult<T, E> {
-  /// Represents the result of an asynchronous operation.
-  ///
-  /// This sealed class provides a type-safe way to handle different states
-  /// of asynchronous operations: initial, loading, data (success), and error.
-  ///
-  /// Usage example:
-  /// ```dart
-  /// AsyncResult<String> result = AsyncResult.loading();
-  /// result.when(
-  ///   whenInitial: () => print("Initial state"),
-  ///   whenLoading: () => print("Loading..."),
-  ///   whenData: (data) => print("Data: $data"),
-  ///   whenError: (error) => print("Error: $error"),
-  /// );
-  /// ```
+  /// {@macro async_result}
   const AsyncResult._();
 
-  /// Creates an instance representing the initial state.
+  /// Creates an [AsyncResult] in the initial state.
+  ///
+  /// Use this to represent an operation that hasn't started yet.
+  ///  /// Example:
+  /// ```dart
+  /// AsyncResult<String, Exception> result = AsyncResult.initial();
+  /// print(result.isInitial); // output: true
+  /// ```
   const factory AsyncResult.initial() = AsyncInitial<T, E>;
 
-  /// Creates an instance representing the loading state.
+  /// Creates an [AsyncResult] in the loading state.
+  ///
+  /// Use this to represent an operation that is currently in progress.
+  ///  /// Example:
+  /// ```dart
+  /// AsyncResult<String, Exception> result = AsyncResult.loading();
+  /// print(result.isLoading); // output: true
+  /// ```
   const factory AsyncResult.loading() = AsyncLoading<T, E>;
 
-  /// Creates an instance representing a successful state with data.
+  /// Creates an [AsyncResult] in the success state with data.
+  ///
+  /// Use this to represent an operation that completed successfully.
+  ///
+  /// Parameters:
+  /// * [data] - The successful result data
+  ///  /// Example:
+  /// ```dart
+  /// AsyncResult<String, Exception> result = AsyncResult.data('Hello');
+  /// print(result.isSuccess); // output: true
+  /// print(result.dataOrThrow); // output: Hello
+  /// ```
   const factory AsyncResult.data(T data) = AsyncData<T, E>;
 
-  /// Creates an instance representing an error state.
+  /// Creates an [AsyncResult] in the error state with an error.
+  ///
+  /// Use this to represent an operation that failed.
+  ///
+  /// Parameters:
+  /// * [error] - The error that occurred
+  ///
+  /// Example:
+  /// ```dart
+  /// AsyncResult<String, Exception> result = AsyncResult.error(Exception('Failed'));
+  /// print(result.isError); // true
+  /// print(result.errorOrThrow is Exception); // true
+  /// ```
   const factory AsyncResult.error(E error) = AsyncError<T, E>;
 
-  /// Checks if all `AsyncResult` instances in the given iterable are completed (success or error).
+  /// Checks if all results in the iterable are completed (either success or error).
   ///
-  /// This method iterates through the provided iterable of `AsyncResult`
-  /// instances and returns `true` if every instance has completed, otherwise
-  /// returns `false`.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - Parameter iterable: An iterable collection of `AsyncResult` instances.
-  /// - Returns: A boolean value indicating whether all `AsyncResult` instances
-  ///   in the iterable are completed.
+  /// Returns `true` if all results are either in success or error state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.error('failed'),
+  /// ];
+  /// print(AsyncResult.allComplete(results)); // output: false
+  /// ```
   static bool allComplete<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.every((result) => result.isCompleted);
   }
 
-  /// Checks if all elements in the given iterable are successful.
+  /// Checks if all results in the iterable are successful.
   ///
-  /// This method takes an iterable of `AsyncResult` objects and returns `true`
-  /// if every element in the iterable has a successful result (`isSuccess` is `true`).
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
+  /// Returns `true` only if all results are in success state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.data(2),
+  /// ];
+  /// print(AsyncResult.allSuccess(results)); // output: true
+  /// ```
   static bool allSuccess<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.every((result) => result.isSuccess);
   }
 
-  /// Checks if all elements in the given iterable are in an error state.
+  /// Checks if all results in the iterable are in error state.
   ///
-  /// This method iterates through the provided [iterable] of [AsyncResult] objects
-  /// and returns `true` if every element is an error. Otherwise, it returns `false`.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - Parameter iterable: An iterable collection of [AsyncResult] objects.
-  /// - Returns: A boolean value indicating whether all elements are errors.
+  /// Returns `true` only if all results are in error state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.error('failed1'),
+  ///   AsyncResult<int, String>.error('failed2'),
+  /// ];
+  /// print(AsyncResult.allError(results)); // output: true
+  /// ```
   static bool allError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.every((result) => result.isError);
   }
 
-  /// Checks if any [AsyncResult] in the given iterable has an error.
+  /// Checks if any result in the iterable is in error state.
   ///
-  /// This method iterates through the provided [iterable] of [AsyncResult]
-  /// objects and returns `true` if at least one of them has an error.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - [iterable]: An iterable collection of [AsyncResult] objects to check.
+  /// Returns `true` if at least one result is in error state.
   ///
-  /// Returns `true` if any [AsyncResult] in the iterable has an error, otherwise `false`.
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.error('failed'),
+  /// ];
+  /// print(AsyncResult.anyError(results)); // output: true
+  /// ```
   static bool anyError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.any((result) => result.isError);
   }
 
-  /// Checks if any of the `AsyncResult` objects in the given iterable are in a loading state.
+  /// Checks if any result in the iterable is in loading state.
   ///
-  /// This method iterates through the provided iterable of `AsyncResult` objects
-  /// and returns `true` if at least one of the objects is currently loading.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - Parameter iterable: An iterable collection of `AsyncResult` objects.
-  /// - Returns: `true` if any `AsyncResult` in the iterable is loading, otherwise `false`.
+  /// Returns `true` if at least one result is in loading state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.loading(),
+  /// ];
+  /// print(AsyncResult.anyLoading(results)); // output: true
+  /// ```
   static bool anyLoading<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.any((result) => result.isLoading);
   }
 
-  /// Checks if any of the `AsyncResult` instances in the given iterable are completed (success or error).
+  /// Checks if any result in the iterable is completed (either success or error).
   ///
-  /// This method iterates through the provided iterable and returns `true` if
-  /// at least one `AsyncResult` has completed, otherwise it returns `false`.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - Parameter iterable: An iterable collection of `AsyncResult` instances.
-  /// - Returns: A boolean value indicating whether any `AsyncResult` in the iterable is completed.
+  /// Returns `true` if at least one result is completed (success or error state).
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.initial(),
+  ///   AsyncResult<int, String>.data(1),
+  /// ];
+  /// print(AsyncResult.anyComplete(results)); // output: true
+  /// ```
   static bool anyComplete<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.any((result) => result.isCompleted);
   }
 
-  /// Checks if any of the [AsyncResult] instances in the given [iterable] is successful.
+  /// Checks if any result in the iterable is in success state.
   ///
-  /// Returns `true` if at least one [AsyncResult] in the [iterable] has a success state,
-  /// otherwise returns `false`.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to check
   ///
-  /// - Parameter iterable: An [Iterable] of [AsyncResult] instances to check.
-  /// - Returns: A [bool] indicating whether any [AsyncResult] in the [iterable] is successful.
+  /// Returns `true` if at least one result is in success state.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.error('failed'),
+  ///   AsyncResult<int, String>.data(1),
+  /// ];
+  /// print(AsyncResult.anySuccess(results)); // output: true
+  /// ```
   static bool anySuccess<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     return iterable.any((result) => result.isSuccess);
   }
 
-  /// Returns an iterable of all data from the provided list of AsyncResults.
+  /// Extracts all data values from successful results in the iterable.
+  ///
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to extract data from
+  ///
+  /// Returns an iterable of data values from all successful results.
+  /// Results in other states are ignored.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.error('failed'),
+  ///   AsyncResult<int, String>.data(2),
+  /// ];
+  /// final data = AsyncResult.getAllData(results).toList();
+  /// print(data); // output: [1, 2]
+  /// ```
   static Iterable<T> getAllData<T, E>(
       Iterable<AsyncResult<T, E>> iterable) sync* {
     for (var result in iterable) {
@@ -118,7 +247,24 @@ sealed class AsyncResult<T, E> {
     }
   }
 
-  /// Returns an iterable of all errors from the provided list of AsyncResults.
+  /// Extracts all error values from failed results in the iterable.
+  ///
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to extract errors from
+  ///
+  /// Returns an iterable of error values from all failed results.
+  /// Results in other states are ignored.
+  ///
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.error('failed1'),
+  ///   AsyncResult<int, String>.error('failed2'),
+  /// ];
+  /// final errors = AsyncResult.getAllError(results).toList();
+  /// print(errors); // output: [failed1, failed2]
+  /// ```
   static Iterable<E> getAllError<T, E>(
       Iterable<AsyncResult<T, E>> iterable) sync* {
     for (var result in iterable) {
@@ -128,16 +274,23 @@ sealed class AsyncResult<T, E> {
     }
   }
 
-  /// Returns the first error found in the given iterable of `AsyncResult` objects.
+  /// Returns the first error found in the iterable, or null if none exist.
   ///
-  /// Iterates through the provided iterable and checks each `AsyncResult`
-  /// for an error. If an error is found, it is returned immediately. If no
-  /// errors are found, `null` is returned.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to search
   ///
-  /// - Parameters:
-  ///   - iterable: An iterable collection of `AsyncResult` objects to be checked for errors.
+  /// Returns the error value of the first result in error state, or null if no errors.
   ///
-  /// - Returns: The first error of type `E` found in the iterable, or `null` if no errors are present.
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.error('first_error'),
+  ///   AsyncResult<int, String>.error('second_error'),
+  /// ];
+  /// final firstError = AsyncResult.getFirstError(results);
+  /// print(firstError); // output: first_error
+  /// ```
   static E? getFirstError<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     for (var result in iterable) {
       if (result.isError) {
@@ -147,17 +300,23 @@ sealed class AsyncResult<T, E> {
     return null;
   }
 
-  /// Returns the first successful data from an iterable of [AsyncResult].
+  /// Returns the first data found in the iterable, or null if none exist.
   ///
-  /// Iterates through the given [iterable] of [AsyncResult] objects and returns
-  /// the data of the first [AsyncResult] that is successful. If no successful
-  /// result is found, returns `null`.
+  /// Parameters:
+  /// * [iterable] - Collection of AsyncResult instances to search
   ///
-  /// - `T`: The type of the data contained in the [AsyncResult].
-  /// - `E`: The type of the error contained in the [AsyncResult].
+  /// Returns the data value of the first result in success state, or null if no data.
   ///
-  /// Returns:
-  /// - The data of the first successful [AsyncResult], or `null` if none is found.
+  /// Example:
+  /// ```dart
+  /// final results = [
+  ///   AsyncResult<int, String>.error('failed'),
+  ///   AsyncResult<int, String>.data(42),
+  ///   AsyncResult<int, String>.data(100),
+  /// ];
+  /// final firstData = AsyncResult.getFirstData(results);
+  /// print(firstData); // output: 42
+  /// ```
   static T? getFirstData<T, E>(Iterable<AsyncResult<T, E>> iterable) {
     for (var result in iterable) {
       if (result.isSuccess) {
@@ -167,41 +326,29 @@ sealed class AsyncResult<T, E> {
     return null;
   }
 
-  /// Combines two [AsyncResult] instances into a single [AsyncResult] containing a record of both results.
+  /// Combines two AsyncResult instances into a single result containing a record.
   ///
-  /// The combined result follows these rules:
-  /// * Returns [AsyncResult.loading] if either result is loading
-  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
-  /// * Returns [AsyncResult.data] with a record containing both data values if both results have data
-  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  /// The combination follows these rules:
+  /// - If any result is in error state, returns the first error
+  /// - If any result is loading, returns loading state
+  /// - If both results have data, returns data with a record containing both values
+  /// - Otherwise, returns initial state
   ///
-  /// ### Example
+  /// Parameters:
+  /// * [result1] - First AsyncResult to combine
+  /// * [result2] - Second AsyncResult to combine
+  ///
+  /// Returns an AsyncResult containing a record with named fields 'first' and 'second'.
+  ///
+  /// Example:
   /// ```dart
-  /// final result1 = AsyncResult.data(1);
-  /// final result2 = AsyncResult.data("hello");
-  /// final combined = AsyncResult.zip2(result1, result2);
-  /// combined.when(
-  /// whenInitial: () { /* handle initial state */ },
-  ///  whenLoading: () { /* handle loading state */ },
-  ///  whenData: (data) {
-  ///   print('Combined result: ${data.first}, ${data.second}');
-  ///  },
-  ///  whenError: (error) { /* handle error state */ },
-  ///);
+  /// final result1 = AsyncResult<int, String>.data(42);
+  /// final result2 = AsyncResult<String, String>.data('hello');
+  /// final combined = AsyncResult.combine2(result1, result2);
+  /// print(combined.dataOrThrow.first); // output: 42
+  /// print(combined.dataOrThrow.second); // output: hello
   /// ```
-  ///
-  /// ### Parameters
-  /// * [result1] - The first [AsyncResult] to combine
-  /// * [result2] - The second [AsyncResult] to combine
-  ///
-  /// ### Type Parameters
-  /// * [T] - The type of the first result's data
-  /// * [U] - The type of the second result's data
-  /// * [E] - The type of possible errors (must be the same for both results)
-  ///
-  /// ### Returns
-  /// An [AsyncResult] containing a record with [first] and [second] fields if successful
-  static AsyncResult<({T first, U second}), E> zip2<T, U, E>(
+  static AsyncResult<({T first, U second}), E> combine2<T, U, E>(
     AsyncResult<T, E> result1,
     AsyncResult<U, E> result2,
   ) {
@@ -225,44 +372,32 @@ sealed class AsyncResult<T, E> {
     return AsyncResult.initial();
   }
 
-  /// Combines three [AsyncResult] instances into a single [AsyncResult] containing a record of all results.
+  /// Combines three AsyncResult instances into a single result containing a record.
   ///
-  /// The combined result follows these rules:
-  /// * Returns [AsyncResult.loading] if either result is loading
-  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
-  /// * Returns [AsyncResult.data] with a record containing the data of all three results if all have data
-  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  /// The combination follows these rules:
+  /// - If any result is in error state, returns the first error
+  /// - If any result is loading, returns loading state
+  /// - If all results have data, returns data with a record containing all values
+  /// - Otherwise, returns initial state
   ///
-  /// ### Example
+  /// Parameters:
+  /// * [result1] - First AsyncResult to combine
+  /// * [result2] - Second AsyncResult to combine
+  /// * [result3] - Third AsyncResult to combine
+  ///
+  /// Returns an AsyncResult containing a record with named fields 'first', 'second', and 'third'.
+  ///
+  /// Example:
   /// ```dart
-  /// final result1 = AsyncResult.data(1);
-  /// final result2 = AsyncResult.data("hello");
-  /// final result3 = AsyncResult.data("world");
-  /// final combined = AsyncResult.zip2(result1, result2, result3);
-  /// combined.when(
-  /// whenInitial: () { /* handle initial state */ },
-  ///  whenLoading: () { /* handle loading state */ },
-  ///  whenData: (data) {
-  ///   print('Combined result: ${data.first}, ${data.second}, ${data.third}');
-  ///  },
-  ///  whenError: (error) { /* handle error state */ },
-  ///);
+  /// final result1 = AsyncResult<int, String>.data(1);
+  /// final result2 = AsyncResult<int, String>.data(2);
+  /// final result3 = AsyncResult<int, String>.data(3);
+  /// final combined = AsyncResult.combine3(result1, result2, result3);
+  /// print(combined.dataOrThrow.first); // output: 1
+  /// print(combined.dataOrThrow.second); // output: 2
+  /// print(combined.dataOrThrow.third); // output: 3
   /// ```
-  ///
-  /// ### Parameters
-  /// * [result1] - The first [AsyncResult] to combine
-  /// * [result2] - The second [AsyncResult] to combine
-  /// * [result3] - The third [AsyncResult] to combine
-  ///
-  /// ### Type Parameters
-  /// * [T] - The type of the first result's data
-  /// * [U] - The type of the second result's data
-  /// * [V] - The type of the third result's data
-  /// * [E] - The type of possible errors (must be the same for both results)
-  ///
-  /// ### Returns
-  /// An [AsyncResult] containing a record with [first], [second] and [third] fields if successful
-  static AsyncResult<({T first, U second, V third}), E> zip3<T, U, V, E>(
+  static AsyncResult<({T first, U second, V third}), E> combine3<T, U, V, E>(
     AsyncResult<T, E> result1,
     AsyncResult<U, E> result2,
     AsyncResult<V, E> result3,
@@ -289,48 +424,33 @@ sealed class AsyncResult<T, E> {
     return AsyncResult.initial();
   }
 
-  /// Combines four [AsyncResult] instances into a single [AsyncResult] containing a record of all results.
+  /// Combines four AsyncResult instances into a single result containing a record.
   ///
-  /// The combined result follows these rules:
-  /// * Returns [AsyncResult.loading] if any result is loading
-  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
-  /// * Returns [AsyncResult.data] with a record containing the data of all four results if all have data
-  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  /// The combination follows these rules:
+  /// - If any result is in error state, returns the first error
+  /// - If any result is loading, returns loading state
+  /// - If all results have data, returns data with a record containing all values
+  /// - Otherwise, returns initial state
   ///
-  /// ### Example
+  /// Parameters:
+  /// * [result1] - First AsyncResult to combine
+  /// * [result2] - Second AsyncResult to combine
+  /// * [result3] - Third AsyncResult to combine
+  /// * [result4] - Fourth AsyncResult to combine
+  ///
+  /// Returns an AsyncResult containing a record with named fields 'first', 'second', 'third', and 'fourth'.
+  ///
+  /// Example:
   /// ```dart
-  /// final result1 = AsyncResult.data(1);
-  /// final result2 = AsyncResult.data("hello");
-  /// final result3 = AsyncResult.data(true);
-  /// final result4 = AsyncResult.data(42.0);
-  /// final combined = AsyncResult.zip4(result1, result2, result3, result4);
-  /// combined.when(
-  ///   whenInitial: () { /* handle initial state */ },
-  ///   whenLoading: () { /* handle loading state */ },
-  ///   whenData: (data) {
-  ///     print('Combined: ${data.first}, ${data.second}, ${data.third}, ${data.fourth}');
-  ///   },
-  ///   whenError: (error) { /* handle error state */ },
-  /// );
+  /// final result1 = AsyncResult<int, String>.data(1);
+  /// final result2 = AsyncResult<int, String>.data(2);
+  /// final result3 = AsyncResult<int, String>.data(3);
+  /// final result4 = AsyncResult<int, String>.data(4);
+  /// final combined = AsyncResult.combine4(result1, result2, result3, result4);
+  /// print(combined.dataOrThrow.fourth); // output: 4
   /// ```
-  ///
-  /// ### Parameters
-  /// * [result1] - The first [AsyncResult] to combine
-  /// * [result2] - The second [AsyncResult] to combine
-  /// * [result3] - The third [AsyncResult] to combine
-  /// * [result4] - The fourth [AsyncResult] to combine
-  ///
-  /// ### Type Parameters
-  /// * [T] - The type of the first result's data
-  /// * [U] - The type of the second result's data
-  /// * [V] - The type of the third result's data
-  /// * [W] - The type of the fourth result's data
-  /// * [E] - The type of possible errors (must be the same for all results)
-  ///
-  /// ### Returns
-  /// An [AsyncResult] containing a record with [first], [second], [third] and [fourth] fields if successful
   static AsyncResult<({T first, U second, V third, W fourth}), E>
-      zip4<T, U, V, W, E>(
+      combine4<T, U, V, W, E>(
     AsyncResult<T, E> result1,
     AsyncResult<U, E> result2,
     AsyncResult<V, E> result3,
@@ -367,51 +487,35 @@ sealed class AsyncResult<T, E> {
     return AsyncResult.initial();
   }
 
-  /// Combines five [AsyncResult] instances into a single [AsyncResult] containing a record of all results.
+  /// Combines five AsyncResult instances into a single result containing a record.
   ///
-  /// The combined result follows these rules:
-  /// * Returns [AsyncResult.loading] if any result is loading
-  /// * Returns [AsyncResult.error] with the first encountered error if any result has error
-  /// * Returns [AsyncResult.data] with a record containing the data of all five results if all have data
-  /// * Returns [AsyncResult.initial] if none of the above conditions are met
+  /// The combination follows these rules:
+  /// - If any result is in error state, returns the first error
+  /// - If any result is loading, returns loading state
+  /// - If all results have data, returns data with a record containing all values
+  /// - Otherwise, returns initial state
   ///
-  /// ### Example
+  /// Parameters:
+  /// * [result1] - First AsyncResult to combine
+  /// * [result2] - Second AsyncResult to combine
+  /// * [result3] - Third AsyncResult to combine
+  /// * [result4] - Fourth AsyncResult to combine
+  /// * [result5] - Fifth AsyncResult to combine
+  ///
+  /// Returns an AsyncResult containing a record with named fields 'first', 'second', 'third', 'fourth', and 'fifth'.
+  ///
+  /// Example:
   /// ```dart
-  /// final result1 = AsyncResult.data(1);
-  /// final result2 = AsyncResult.data("hello");
-  /// final result3 = AsyncResult.data(true);
-  /// final result4 = AsyncResult.data(42.0);
-  /// final result5 = AsyncResult.data([1,2,3]);
-  /// final combined = AsyncResult.zip5(result1, result2, result3, result4, result5);
-  /// combined.when(
-  ///   whenInitial: () { /* handle initial state */ },
-  ///   whenLoading: () { /* handle loading state */ },
-  ///   whenData: (data) {
-  ///     print('Combined: ${data.first}, ${data.second}, ${data.third}, ${data.fourth}, ${data.fifth}');
-  ///   },
-  ///   whenError: (error) { /* handle error state */ },
-  /// );
+  /// final result1 = AsyncResult<int, String>.data(1);
+  /// final result2 = AsyncResult<int, String>.data(2);
+  /// final result3 = AsyncResult<int, String>.data(3);
+  /// final result4 = AsyncResult<int, String>.data(4);
+  /// final result5 = AsyncResult<int, String>.data(5);
+  /// final combined = AsyncResult.combine5(result1, result2, result3, result4, result5);
+  /// print(combined.dataOrThrow.fifth); // output: 5
   /// ```
-  ///
-  /// ### Parameters
-  /// * [result1] - The first [AsyncResult] to combine
-  /// * [result2] - The second [AsyncResult] to combine
-  /// * [result3] - The third [AsyncResult] to combine
-  /// * [result4] - The fourth [AsyncResult] to combine
-  /// * [result5] - The fifth [AsyncResult] to combine
-  ///
-  /// ### Type Parameters
-  /// * [T] - The type of the first result's data
-  /// * [U] - The type of the second result's data
-  /// * [V] - The type of the third result's data
-  /// * [W] - The type of the fourth result's data
-  /// * [X] - The type of the fifth result's data
-  /// * [E] - The type of possible errors (must be the same for all results)
-  ///
-  /// ### Returns
-  /// An [AsyncResult] containing a record with [first], [second], [third], [fourth] and [fifth] fields if successful
   static AsyncResult<({T first, U second, V third, W fourth, X fifth}), E>
-      zip5<T, U, V, W, X, E>(
+      combine5<T, U, V, W, X, E>(
     AsyncResult<T, E> result1,
     AsyncResult<U, E> result2,
     AsyncResult<V, E> result3,
@@ -453,25 +557,30 @@ sealed class AsyncResult<T, E> {
     return AsyncResult.initial();
   }
 
-  /// Combines multiple [AsyncResult] instances into a single [AsyncResult] containing a list of their values.
+  /// Combines multiple AsyncResult instances from an iterable into a single result containing a list.
   ///
-  /// The resulting [AsyncResult] follows these rules:
-  /// * If any result is loading, returns a loading state
-  /// * If any result has an error, returns the first error encountered
-  /// * If all results have data, returns a list containing all data values
-  /// * Otherwise returns an initial state
+  /// The combination follows these rules:
+  /// - If any result is in error state, returns the first error
+  /// - If any result is loading, returns loading state
+  /// - If all results have data, returns data with a list containing all values
+  /// - Otherwise, returns initial state
+  ///
+  /// Parameters:
+  /// * [results] - Iterable of AsyncResult instances to combine
+  ///
+  /// Returns an AsyncResult containing a list of all data values in the same order.
   ///
   /// Example:
   /// ```dart
-  /// final result1 = AsyncResult.data(1);
-  /// final result2 = AsyncResult.data("hello");
-  /// final combined = AsyncResult.zipMultiple([result1, result2]);
-  /// // combined will be AsyncResult.data([1, "hello"])
+  /// final results = [
+  ///   AsyncResult<int, String>.data(1),
+  ///   AsyncResult<int, String>.data(2),
+  ///   AsyncResult<int, String>.data(3),
+  /// ];
+  /// final combined = AsyncResult.combineIterable(results);
+  /// print(combined.dataOrThrow); // output: [1, 2, 3]
   /// ```
-  ///
-  /// [results] - An iterable of [AsyncResult] instances to combine
-  /// Returns an [AsyncResult] combining the states of all input results
-  static AsyncResult<List<dynamic>, E> zipMultiple<E>(
+  static AsyncResult<List<dynamic>, E> combineIterable<E>(
     Iterable<AsyncResult<dynamic, E>> results,
   ) {
     // Check error state
@@ -488,49 +597,122 @@ sealed class AsyncResult<T, E> {
     // Check data state
     if (results.every((result) => result.isSuccess)) {
       return AsyncResult.data(
-          results.map((result) => result.dataOrNull).toList());
+        results.map((result) => result.dataOrNull).toList(),
+      );
     }
 
     // If none of the above, return initial
     return AsyncResult.initial();
   }
 
-  /// Returns true if this instance represents the initial state.
+  /// Returns `true` if this result is in the initial state.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.initial();
+  /// print(result.isInitial); // output: true
+  /// ```
   bool get isInitial;
 
-  /// Returns true if this instance represents the loading state.
+  /// Returns `true` if this result is in the loading state.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.loading();
+  /// print(result.isLoading); // output: true
+  /// ```
   bool get isLoading;
 
-  /// Returns true if this instance represents an error state.
-  @Deprecated('Please use isError instead.')
-  bool get hasError;
-
-  /// Returns true if this instance contains data
-  @Deprecated('Please use isSuccess instead.')
-  bool get hasData;
-
-  /// Returns true if this instance is a successful state.
+  /// Returns `true` if this result is in the success state with data.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// print(result.isSuccess); // output: true
+  /// ```
   bool get isSuccess;
 
-  /// Returns true if this instance is an error state.
+  /// Returns `true` if this result is in the error state.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.error('failed');
+  /// print(result.isError); // output: true
+  /// ```
   bool get isError;
 
-  /// Returns true if this instance is in either loading or initial state.
-  bool get isLoadingOrInitial;
+  /// Alias for [isError]. Returns `true` if this result has an error.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.error('failed');
+  /// print(result.hasError); // output: true
+  /// ```
+  bool get hasError => isError;
 
-  /// Returns true if this instance is in either data or error state.
-  bool get isDateOrError;
+  /// Alias for [isSuccess]. Returns `true` if this result has data.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// print(result.hasData); // output: true
+  /// ```
+  bool get hasData => isSuccess;
 
-  /// Returns true if this AsyncResult is in a final state (data or error).
-  bool get isCompleted;
+  /// Returns `true` if this result is either loading or initial.
+  ///
+  /// Useful for checking if an operation is not yet completed.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.loading();
+  /// print(result.isLoadingOrInitial); // output: true
+  /// ```
+  bool get isLoadingOrInitial => isLoading || isInitial;
 
-  /// Returns the data if available, otherwise null.
+  /// Returns `true` if this result has either data or an error.
+  ///
+  /// Useful for checking if an operation has completed.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// print(result.isDataOrError); // output: true
+  /// ```
+  bool get isDataOrError => isSuccess || isError;
+
+  /// Returns `true` if this result is completed (either success or error).
+  ///
+  /// Alias for [isDataOrError].
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// print(result.isCompleted); // output: true
+  /// ```
+  bool get isCompleted => isSuccess || isError;
+
+  /// Returns the data if successful, otherwise returns `null`.
+  ///
+  /// This is a safe way to access data without throwing exceptions.
+  /// Example:
+  /// ```dart
+  /// final success = AsyncResult<int, String>.data(42);
+  /// final error = AsyncResult<int, String>.error('failed');
+  ///
+  /// print(success.dataOrNull); // output: 42
+  /// print(error.dataOrNull); // output: null
+  /// ```
   T? get dataOrNull;
 
   /// Returns data if present, otherwise throws the error.
   /// ***Note***: Always check `isSuccess` before using this getter to avoid errors.
   /// If you're unsure about the state, consider using `dataOrNull` instead which
   /// returns `null` when the result is not successful.
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final data = result.dataOrThrow; // 42
+  /// final errorResult = AsyncResult<int, String>.error("Error");
+  /// final data = errorResult.dataOrThrow; // Throws AsyncResultDataNotFoundException
+  /// /// If you're unsure about the state, use:
+  /// final data = result.dataOrNull; // null if not successful
+  /// //or check isSuccess before accessing dataOrThrow
+  /// if (result.isSuccess) {
+  ///  final data = result.dataOrThrow; // 42
+  /// }
+  /// ```
   T get dataOrThrow;
 
   /// Returns the error if available, otherwise null.
@@ -548,226 +730,320 @@ sealed class AsyncResult<T, E> {
   /// Returns the error if available, otherwise returns the provided default value.
   E getErrorOrElse(E defaultValue);
 
-  /// Allows pattern matching on the different states of AsyncResult.
+  /// Transforms this result by applying different functions based on its state.
   ///
-  /// Example:
+  /// This is the primary way to handle all possible states of an AsyncResult.
+  /// All cases must be handled.
+  ///
+  /// Parameters:
+  /// * [initial] - Function to call when in initial state
+  /// * [loading] - Function to call when in loading state
+  /// * [data] - Function to call when successful with data
+  /// * [error] - Function to call when in error state
+  ///  /// Example:
   /// ```dart
-  /// result.when(
-  ///   whenInitial: () => print("Initial"),
-  ///   whenLoading: () => print("Loading"),
-  ///   whenData: (data) => print("Data: $data"),
-  ///   whenError: (error) => print("Error: $error"),
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final message = result.when(
+  ///   initial: () => 'Not started',
+  ///   loading: () => 'Loading...',
+  ///   data: (value) => 'Got: $value',
+  ///   error: (err) => 'Error: $err',
   /// );
+  /// print(message); // output: Got: 42
   /// ```
   R when<R>({
-    required R Function() whenInitial,
-    required R Function() whenLoading,
-    required R Function(T data) whenData,
-    required R Function(E error) whenError,
+    required R Function() initial,
+    required R Function() loading,
+    required R Function(T data) data,
+    required R Function(E error) error,
   });
 
-  /// Similar to `when`, but allows for a default case with `orElse`.
+  /// Like [when] but with optional handlers and a required fallback.
+  ///
+  /// Only the states you care about need to be handled, with [orElse]
+  /// called for unhandled states.
+  ///
+  /// Parameters:
+  /// * [initial] - Optional function for initial state
+  /// * [loading] - Optional function for loading state
+  /// * [data] - Optional function for success state
+  /// * [error] - Optional function for error state
+  /// * [orElse] - Required fallback for unhandled states
   ///
   /// Example:
-  /// ```dart
-  /// result.maybeWhen(
-  ///   whenData: (data) => print("Data: $data"),
-  ///   orElse: () => print("Not in data state"),
+  /// ```dart  /// final result = AsyncResult<int, String>.data(42);
+  /// final value = result.maybeWhen(
+  ///   data: (value) => value * 2,
+  ///   orElse: () => 0,
   /// );
+  /// print(value); // output: 84
   /// ```
   R maybeWhen<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
     required R Function() orElse,
   });
 
-  /// Executes the given function if the state is initial.
   R? whenInitial<R>(R Function() whenInitial);
 
-  /// Executes the given function if the state is loading.
   R? whenLoading<R>(R Function() whenLoading);
 
-  /// Executes the given function if the state has data.
   R? whenData<R>(R Function(T data) whenData);
 
-  /// Executes the given function if the state has an error.
   R? whenError<R>(R Function(E error) whenError);
 
-  /// Allows pattern matching on the different states of AsyncResult,
-  /// returning null if no matching function is provided.
-  ///
-  /// Example:
-  /// ```dart
-  /// final result = result.whenOrNull(
-  ///   whenData: (data) => "Data: $data",
-  ///   whenError: (error) => "Error: $error",
-  /// );
-  /// print(result ?? "No match");
-  /// ```
   R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
   });
 
-  /// Maps the success value of this AsyncResult to a new value of type R.
+  /// Transforms the data if successful, preserving other states.
   ///
-  /// If this AsyncResult is in the data state, applies the given mapping function
-  /// to the data value and returns a new AsyncResult with the mapped value.
-  /// Otherwise, returns this AsyncResult unchanged (but with updated generic types).
+  /// If this result contains data, applies [mapper] to transform it.
+  /// Otherwise, returns a new result with the same state.
   ///
-  /// Example:
+  /// Parameters:
+  /// * [mapper] - Function to transform the data
+  ///  /// Example:
   /// ```dart
-  /// final result = AsyncResult<int, String>.data(42);
-  /// final mapped = result.map((i) => i.toString()); // AsyncResult<String, String>
+  /// final result = AsyncResult<int, String>.data(21);
+  /// final doubled = result.map((x) => x * 2);
+  /// print(doubled.dataOrThrow); // output: 42
   /// ```
   AsyncResult<R, E> map<R>(R Function(T data) mapper);
 
-  /// Maps the error value of this AsyncResult to a new error type F.
+  /// Transforms the error if present, preserving other states.
   ///
-  /// If this AsyncResult is in the error state, applies the given mapping function
-  /// to the error value and returns a new AsyncResult with the mapped error.
-  /// Otherwise, returns this AsyncResult unchanged (but with updated generic types).
+  /// If this result contains an error, applies [mapper] to transform it.
+  /// Otherwise, returns a new result with the same state.
+  ///
+  /// Parameters:
+  /// * [mapper] - Function to transform the error
   ///
   /// Example:
   /// ```dart
-  /// final result = AsyncResult<int, String>.error("error");
-  /// final mapped = result.mapError((e) => Exception(e)); // AsyncResult<int, Exception>
+  /// final result = AsyncResult<int, String>.error('failed');  /// final mapped = result.mapError((err) => 'Error: $err');
+  /// print(mapped.errorOrThrow); // output: Error: failed
   /// ```
   AsyncResult<T, F> mapError<F>(F Function(E error) mapper);
 
-  /// Maps both success and error values simultaneously.
+  /// Transforms both data and error with different functions.
+  ///
+  /// Applies the appropriate mapper based on the current state.
+  /// Loading and initial states are preserved.
+  ///
+  /// Parameters:
+  /// * [data] - Function to transform success data
+  /// * [error] - Function to transform error
   ///
   /// Example:
-  /// ```dart
-  /// final result = AsyncResult<int, String>.data(42);
+  /// ```dart  /// final result = AsyncResult<int, String>.data(42);
   /// final mapped = result.bimap(
-  ///   data: (i) => i.toString(),
-  ///   error: (e) => Exception(e),
+  ///   data: (x) => x.toString(),
+  ///   error: (err) => err.length,
   /// );
+  /// print(mapped.dataOrThrow); // output: 42
   /// ```
   AsyncResult<R, F> bimap<R, F>({
     required R Function(T data) data,
     required F Function(E error) error,
   });
 
-  /// Chains another AsyncResult-returning operation only if this instance contains data.
+  /// Chains another AsyncResult-returning operation on the data.
+  ///
+  /// If this result contains data, applies [mapper] and returns the result.
+  /// Otherwise, returns a new result with the same state.
+  ///
+  /// This is useful for chaining operations that themselves return AsyncResult.
+  ///
+  /// Parameters:
+  /// * [mapper] - Function that returns another AsyncResult
   ///
   /// Example:
   /// ```dart
+  /// AsyncResult<String, String> parseAndValidate(int x) {
+  ///   if (x > 0) return AsyncResult.data(x.toString());
+  ///   return AsyncResult.error('Invalid');
+  /// }
+  ///
   /// final result = AsyncResult<int, String>.data(42);
-  /// final chained = result.flatMap((data) => AsyncResult.data(data.toString()));
+  /// final chained = result.flatMap(parseAndValidate);
+  /// print(chained.dataOrThrow); // output: 42
   /// ```
   AsyncResult<R, E> flatMap<R>(AsyncResult<R, E> Function(T data) mapper);
 
-  /// Recovers from an error state by transforming the error into data.
+  /// Recovers from an error by converting it to data.
   ///
-  /// Example:
+  /// If this result contains an error, applies [recovery] to convert it to data.
+  /// Otherwise, returns the result unchanged.
+  ///
+  /// Parameters:
+  /// * [recovery] - Function to convert error to data
+  ///  /// Example:
   /// ```dart
-  /// final result = AsyncResult<int, String>.error("Not found");
-  /// final recovered = result.recover((error) => -1);
+  /// final result = AsyncResult<int, String>.error('failed');
+  /// final recovered = result.recover((err) => -1);
+  /// print(recovered.dataOrThrow); // output: -1
   /// ```
   AsyncResult<T, E> recover(T Function(E error) recovery);
 
-  /// Returns true if the data value satisfies the given predicate.
+  /// Tests if the data satisfies a predicate.
   ///
-  /// Returns false if this instance is not in the data state.
+  /// Returns `true` only if this result contains data and the predicate returns `true`.
+  /// Returns `false` for all other states.
+  ///
+  /// Parameters:
+  /// * [predicate] - Function to test the data
   ///
   /// Example:
   /// ```dart
-  /// final result = AsyncResult<int, String>.data(42);
-  /// final isPositive = result.any((data) => data > 0); // true
+  /// final result = AsyncResult<int, String>.data(42);  /// print(result.any((x) => x > 40)); // output: true
+  /// print(result.any((x) => x < 40)); // output: false
   /// ```
-  bool any(bool Function(T data) predicate) {
-    return when(
-      whenData: predicate,
-      whenError: (_) => false,
-      whenLoading: () => false,
-      whenInitial: () => false,
-    );
-  }
+  bool any(bool Function(T data) predicate);
 
-  /// Creates a new AsyncResult with a transformed error, but only if it matches a condition.
+  /// Conditionally transforms the error.
+  ///
+  /// If this result contains an error that satisfies [test], applies [mapper].
+  /// Otherwise, returns the result unchanged.
+  ///
+  /// Parameters:
+  /// * [test] - Predicate to test the error
+  /// * [mapper] - Function to transform the error
   ///
   /// Example:
-  /// ```dart
-  /// final result = AsyncResult<int, String>.error("Not found");
+  /// ```dart  /// final result = AsyncResult<int, String>.error('network_error');
   /// final mapped = result.mapErrorWhere(
-  ///   (e) => e.contains("not"),
-  ///   (e) => "404: $e",
+  ///   (err) => err.startsWith('network'),
+  ///   (err) => 'Connection failed',
   /// );
+  /// print(mapped.errorOrThrow); // output: Connection failed
   /// ```
   AsyncResult<T, E> mapErrorWhere(
     bool Function(E error) test,
     E Function(E error) mapper,
-  ) {
-    return when(
-      whenData: (data) => AsyncResult.data(data),
-      whenError: (error) => AsyncResult.error(
-        test(error) ? mapper(error) : error,
-      ),
-      whenLoading: () => AsyncResult.loading(),
-      whenInitial: () => AsyncResult.initial(),
-    );
-  }
+  );
 
-  /// Creates a new AsyncResult with transformed data, but only if it matches a condition.
+  /// Conditionally transforms the data.
+  ///
+  /// If this result contains data that satisfies [test], applies [mapper].
+  /// Otherwise, returns the result unchanged.
+  ///
+  /// Parameters:
+  /// * [test] - Predicate to test the data
+  /// * [mapper] - Function to transform the data
   ///
   /// Example:
-  /// ```dart
-  /// final result = AsyncResult<int, String>.data(42);
+  /// ```dart  /// final result = AsyncResult<int, String>.data(42);
   /// final mapped = result.mapWhere(
-  ///   (i) => i > 0,
-  ///   (i) => i * 2,
+  ///   (x) => x > 40,
+  ///   (x) => x * 2,
   /// );
+  /// print(mapped.dataOrThrow); // output: 84
   /// ```
   AsyncResult<T, E> mapWhere(
     bool Function(T data) test,
     T Function(T data) mapper,
-  ) {
+  );
+
+  /// Validates the data and converts to error if invalid.
+  ///
+  /// If this result contains data that fails [predicate], converts it to an error
+  /// using [errorBuilder]. Otherwise, returns the result unchanged.
+  ///
+  /// Parameters:
+  /// * [predicate] - Function to validate the data
+  /// * [errorBuilder] - Function to create error from invalid data
+  ///  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(-5);
+  /// final validated = result.validate(
+  ///   (x) => x >= 0,
+  ///   (x) => 'Negative number: $x',
+  /// );
+  /// print(validated.errorOrThrow); // output: Negative number: -5
+  /// ```
+  AsyncResult<T, E> validate(
+    bool Function(T data) predicate,
+    E Function(T data) errorBuilder,
+  );
+
+  /// Swaps success and error types.
+  ///
+  /// Converts successful results to errors and vice versa.
+  /// Loading and initial states are preserved.
+  ///
+  /// This can be useful when you want to handle success as an error condition.
+  ///  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final swapped = result.swap();
+  /// print(swapped.errorOrThrow); // output: 42
+  /// ```
+  AsyncResult<E, T> swap();
+
+  /// Filters the data based on a predicate.
+  ///
+  /// If this result contains data that satisfies [predicate], returns it unchanged.
+  /// If the data fails the predicate, converts to an error using [errorBuilder].
+  /// Other states are preserved.
+  ///
+  /// Parameters:
+  /// * [predicate] - Function to test the data
+  /// * [errorBuilder] - Function to create error for filtered data
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);  /// final filtered = result.filter(
+  ///   (x) => x > 50,
+  ///   () => 'Value too small',
+  /// );
+  /// print(filtered.errorOrThrow); // output: Value too small
+  /// ```
+  AsyncResult<T, E> filter(
+    bool Function(T data) predicate,
+    E Function() errorBuilder,
+  );
+
+  /// Executes a side effect based on the current state.
+  ///
+  /// This allows you to perform actions (like logging) without changing the result.
+  /// Returns the original result unchanged.
+  ///
+  /// Parameters:
+  /// * [onData] - Optional action to perform on success data
+  /// * [onError] - Optional action to perform on error
+  /// * [onLoading] - Optional action to perform when loading
+  /// * [onInitial] - Optional action to perform when initial
+  ///  /// Example:
+  /// ```dart
+  /// final result = AsyncResult<int, String>.data(42);
+  /// final same = result.tap(
+  ///   onData: (data) => print('Got data: $data'),
+  ///   onError: (error) => print('Got error: $error'),
+  /// );
+  /// print(identical(result, same)); // output: true (Returns the same instance)
+  /// ```
+  AsyncResult<T, E> tap({
+    void Function(T data)? onData,
+    void Function(E error)? onError,
+    void Function()? onLoading,
+    void Function()? onInitial,
+  });
+
+  @override
+  String toString() {
     return when(
-      whenData: (data) => AsyncResult.data(
-        test(data) ? mapper(data) : data,
-      ),
-      whenError: (error) => AsyncResult.error(error),
-      whenLoading: () => AsyncResult.loading(),
-      whenInitial: () => AsyncResult.initial(),
+      initial: () => 'AsyncResult.initial()',
+      loading: () => 'AsyncResult.loading()',
+      data: (data) => 'AsyncResult.data($data)',
+      error: (error) => 'AsyncResult.error($error)',
     );
   }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is AsyncResult<T, E> &&
-        other.isInitial == isInitial &&
-        other.isLoading == isLoading &&
-        other.isError == isError &&
-        other.isSuccess == isSuccess &&
-        other.isLoadingOrInitial == isLoadingOrInitial &&
-        other.isDateOrError == isDateOrError &&
-        other.isCompleted == isCompleted &&
-        other.dataOrNull == dataOrNull &&
-        other.errorOrNull == errorOrNull;
-  }
-
-  @override
-  int get hashCode => Object.hashAll([
-        isInitial,
-        isLoading,
-        isError,
-        isSuccess,
-        isLoadingOrInitial,
-        isDateOrError,
-        isCompleted,
-        dataOrNull,
-        errorOrNull,
-      ]);
-
-  @override
-  String toString() => 'AsyncResult()';
 }
 
 /// Represents the initial state of an asynchronous operation.
@@ -787,28 +1063,16 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
   bool get isSuccess => false;
 
   @override
-  bool get hasError => false;
-
-  @override
-  bool get hasData => false;
-
-  @override
-  bool get isLoadingOrInitial => true;
-
-  @override
-  bool get isDateOrError => false;
-
-  @override
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNotFoundException();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException<T, E>();
 
   @override
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException<T, E>();
 
   @override
   T getDataOrElse(T defaultValue) => defaultValue;
@@ -817,16 +1081,13 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
   E getErrorOrElse(E defaultValue) => defaultValue;
 
   @override
-  bool get isCompleted => false;
-
-  @override
   R when<R>({
-    required R Function() whenInitial,
-    required R Function() whenLoading,
-    required R Function(T data) whenData,
-    required R Function(E error) whenError,
+    required R Function() initial,
+    required R Function() loading,
+    required R Function(T data) data,
+    required R Function(E error) error,
   }) =>
-      whenInitial();
+      initial();
 
   @override
   R? whenError<R>(R Function(E error) whenError) => null;
@@ -842,22 +1103,22 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
 
   @override
   R maybeWhen<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
     required R Function() orElse,
   }) =>
-      whenInitial?.call() ?? orElse();
+      initial?.call() ?? orElse();
 
   @override
   R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
   }) =>
-      whenInitial?.call();
+      initial?.call();
 
   @override
   AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
@@ -883,7 +1144,57 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
       AsyncResult<T, E>.initial();
 
   @override
-  String toString() => 'AsyncInitial()';
+  bool any(bool Function(T data) predicate) => false;
+
+  @override
+  AsyncResult<T, E> mapErrorWhere(
+    bool Function(E error) test,
+    E Function(E error) mapper,
+  ) =>
+      AsyncResult<T, E>.initial();
+
+  @override
+  AsyncResult<T, E> mapWhere(
+    bool Function(T data) test,
+    T Function(T data) mapper,
+  ) =>
+      AsyncResult<T, E>.initial();
+
+  @override
+  AsyncResult<T, E> validate(
+    bool Function(T data) predicate,
+    E Function(T data) errorBuilder,
+  ) =>
+      AsyncResult<T, E>.initial();
+
+  @override
+  AsyncResult<E, T> swap() => AsyncResult<E, T>.initial();
+
+  @override
+  AsyncResult<T, E> filter(
+    bool Function(T data) predicate,
+    E Function() errorBuilder,
+  ) =>
+      AsyncResult<T, E>.initial();
+
+  @override
+  AsyncResult<T, E> tap({
+    void Function(T data)? onData,
+    void Function(E error)? onError,
+    void Function()? onLoading,
+    void Function()? onInitial,
+  }) {
+    onInitial?.call();
+    return this;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsyncInitial<T, E> && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Represents the loading state of an asynchronous operation.
@@ -903,28 +1214,16 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
   bool get isSuccess => false;
 
   @override
-  bool get hasError => false;
-
-  @override
-  bool get hasData => false;
-
-  @override
-  bool get isLoadingOrInitial => true;
-
-  @override
-  bool get isDateOrError => false;
-
-  @override
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNotFoundException();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException<T, E>();
 
   @override
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException<T, E>();
 
   @override
   T getDataOrElse(T defaultValue) => defaultValue;
@@ -933,16 +1232,13 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
   E getErrorOrElse(E defaultValue) => defaultValue;
 
   @override
-  bool get isCompleted => false;
-
-  @override
   R when<R>({
-    required R Function() whenInitial,
-    required R Function() whenLoading,
-    required R Function(T data) whenData,
-    required R Function(E error) whenError,
+    required R Function() initial,
+    required R Function() loading,
+    required R Function(T data) data,
+    required R Function(E error) error,
   }) =>
-      whenLoading();
+      loading();
 
   @override
   R? whenError<R>(R Function(E error) whenError) => null;
@@ -958,22 +1254,22 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
 
   @override
   R maybeWhen<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
     required R Function() orElse,
   }) =>
-      whenLoading?.call() ?? orElse();
+      loading?.call() ?? orElse();
 
   @override
   R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
   }) =>
-      whenLoading?.call();
+      loading?.call();
 
   @override
   AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
@@ -999,7 +1295,57 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
       AsyncResult<T, E>.loading();
 
   @override
-  String toString() => 'AsyncLoading()';
+  bool any(bool Function(T data) predicate) => false;
+
+  @override
+  AsyncResult<T, E> mapErrorWhere(
+    bool Function(E error) test,
+    E Function(E error) mapper,
+  ) =>
+      AsyncResult<T, E>.loading();
+
+  @override
+  AsyncResult<T, E> mapWhere(
+    bool Function(T data) test,
+    T Function(T data) mapper,
+  ) =>
+      AsyncResult<T, E>.loading();
+
+  @override
+  AsyncResult<T, E> validate(
+    bool Function(T data) predicate,
+    E Function(T data) errorBuilder,
+  ) =>
+      AsyncResult<T, E>.loading();
+
+  @override
+  AsyncResult<E, T> swap() => AsyncResult<E, T>.loading();
+
+  @override
+  AsyncResult<T, E> filter(
+    bool Function(T data) predicate,
+    E Function() errorBuilder,
+  ) =>
+      AsyncResult<T, E>.loading();
+
+  @override
+  AsyncResult<T, E> tap({
+    void Function(T data)? onData,
+    void Function(E error)? onError,
+    void Function()? onLoading,
+    void Function()? onInitial,
+  }) {
+    onLoading?.call();
+    return this;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsyncLoading<T, E> && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Represents a successful state of an asynchronous operation with data.
@@ -1022,18 +1368,6 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   bool get isSuccess => true;
 
   @override
-  bool get hasError => false;
-
-  @override
-  bool get isLoadingOrInitial => false;
-
-  @override
-  bool get isDateOrError => true;
-
-  @override
-  bool get hasData => true;
-
-  @override
   T? get dataOrNull => _data;
 
   @override
@@ -1043,7 +1377,7 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   E? get errorOrNull => null;
 
   @override
-  E get errorOrThrow => throw AsyncResultErrorNotFoundException();
+  E get errorOrThrow => throw AsyncResultErrorNotFoundException<T, E>();
 
   @override
   T getDataOrElse(T defaultValue) => _data;
@@ -1052,16 +1386,13 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
   E getErrorOrElse(E defaultValue) => defaultValue;
 
   @override
-  bool get isCompleted => true;
-
-  @override
   R when<R>({
-    required R Function() whenInitial,
-    required R Function() whenLoading,
-    required R Function(T data) whenData,
-    required R Function(E error) whenError,
+    required R Function() initial,
+    required R Function() loading,
+    required R Function(T data) data,
+    required R Function(E error) error,
   }) =>
-      whenData(_data);
+      data(_data);
 
   @override
   R? whenError<R>(R Function(E error) whenError) => null;
@@ -1077,12 +1408,12 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
   }) =>
-      whenData?.call(_data);
+      data?.call(_data);
 
   @override
   AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
@@ -1108,13 +1439,64 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   R maybeWhen<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
     required R Function() orElse,
   }) =>
-      whenData?.call(_data) ?? orElse();
+      data?.call(_data) ?? orElse();
+
+  @override
+  bool any(bool Function(T data) predicate) => predicate(_data);
+
+  @override
+  AsyncResult<T, E> mapErrorWhere(
+    bool Function(E error) test,
+    E Function(E error) mapper,
+  ) =>
+      AsyncResult<T, E>.data(_data);
+
+  @override
+  AsyncResult<T, E> mapWhere(
+    bool Function(T data) test,
+    T Function(T data) mapper,
+  ) =>
+      AsyncResult<T, E>.data(
+        test(_data) ? mapper(_data) : _data,
+      );
+
+  @override
+  AsyncResult<T, E> validate(
+    bool Function(T data) predicate,
+    E Function(T data) errorBuilder,
+  ) =>
+      predicate(_data)
+          ? AsyncResult<T, E>.data(_data)
+          : AsyncResult<T, E>.error(errorBuilder(_data));
+
+  @override
+  AsyncResult<E, T> swap() => AsyncResult<E, T>.error(_data);
+
+  @override
+  AsyncResult<T, E> filter(
+    bool Function(T data) predicate,
+    E Function() errorBuilder,
+  ) =>
+      predicate(_data)
+          ? AsyncResult<T, E>.data(_data)
+          : AsyncResult<T, E>.error(errorBuilder());
+
+  @override
+  AsyncResult<T, E> tap({
+    void Function(T data)? onData,
+    void Function(E error)? onError,
+    void Function()? onLoading,
+    void Function()? onInitial,
+  }) {
+    onData?.call(_data);
+    return this;
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -1125,9 +1507,6 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => _data.hashCode;
-
-  @override
-  String toString() => 'AsyncData($_data)';
 }
 
 /// Represents an error state of an asynchronous operation.
@@ -1150,22 +1529,10 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
   bool get isSuccess => false;
 
   @override
-  bool get hasError => true;
-
-  @override
-  bool get hasData => false;
-
-  @override
-  bool get isLoadingOrInitial => false;
-
-  @override
-  bool get isDateOrError => true;
-
-  @override
   T? get dataOrNull => null;
 
   @override
-  T get dataOrThrow => throw AsyncResultDataNotFoundException();
+  T get dataOrThrow => throw AsyncResultDataNotFoundException<T, E>();
 
   @override
   E? get errorOrNull => _error;
@@ -1180,16 +1547,13 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
   E getErrorOrElse(E defaultValue) => _error;
 
   @override
-  bool get isCompleted => true;
-
-  @override
   R when<R>({
-    required R Function() whenInitial,
-    required R Function() whenLoading,
-    required R Function(T data) whenData,
-    required R Function(E error) whenError,
+    required R Function() initial,
+    required R Function() loading,
+    required R Function(T data) data,
+    required R Function(E error) error,
   }) =>
-      whenError(_error);
+      error(_error);
 
   @override
   R? whenError<R>(R Function(E error) whenError) => whenError(_error);
@@ -1205,22 +1569,22 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
 
   @override
   R maybeWhen<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
     required R Function() orElse,
   }) =>
-      whenError?.call(_error) ?? orElse();
+      error?.call(_error) ?? orElse();
 
   @override
   R? whenOrNull<R>({
-    R Function()? whenInitial,
-    R Function()? whenLoading,
-    R Function(T data)? whenData,
-    R Function(E error)? whenError,
+    R Function()? initial,
+    R Function()? loading,
+    R Function(T data)? data,
+    R Function(E error)? error,
   }) =>
-      whenError?.call(_error);
+      error?.call(_error);
 
   @override
   AsyncResult<R, E> map<R>(R Function(T data) mapper) =>
@@ -1246,6 +1610,53 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
       AsyncResult<T, E>.data(recovery(_error));
 
   @override
+  bool any(bool Function(T data) predicate) => false;
+
+  @override
+  AsyncResult<T, E> mapErrorWhere(
+    bool Function(E error) test,
+    E Function(E error) mapper,
+  ) =>
+      AsyncResult<T, E>.error(
+        test(_error) ? mapper(_error) : _error,
+      );
+
+  @override
+  AsyncResult<T, E> mapWhere(
+    bool Function(T data) test,
+    T Function(T data) mapper,
+  ) =>
+      AsyncResult<T, E>.error(_error);
+
+  @override
+  AsyncResult<T, E> validate(
+    bool Function(T data) predicate,
+    E Function(T data) errorBuilder,
+  ) =>
+      AsyncResult<T, E>.error(_error);
+
+  @override
+  AsyncResult<E, T> swap() => AsyncResult<E, T>.data(_error);
+
+  @override
+  AsyncResult<T, E> filter(
+    bool Function(T data) predicate,
+    E Function() errorBuilder,
+  ) =>
+      AsyncResult<T, E>.error(_error);
+
+  @override
+  AsyncResult<T, E> tap({
+    void Function(T data)? onData,
+    void Function(E error)? onError,
+    void Function()? onLoading,
+    void Function()? onInitial,
+  }) {
+    onError?.call(_error);
+    return this;
+  }
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is AsyncError<T, E> &&
@@ -1254,7 +1665,4 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => _error.hashCode;
-
-  @override
-  String toString() => 'AsyncError($_error)';
 }

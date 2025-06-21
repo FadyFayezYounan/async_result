@@ -1,15 +1,37 @@
 # AsyncResult
 
-A powerful and type-safe way to handle different states of asynchronous operations in Dart and Flutter applications. AsyncResult helps you manage the common states of async operations: initial, loading, data (success), and error states.
+A powerful and type-safe way to handle different states of asynchronous operations in Dart and Flutter applications, specifically designed for seamless integration with the Bloc package. AsyncResult helps you manage the common states of async operations: initial, loading, data (success), and error states in your BLoC architecture.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Overview](#overview)
+- [States](#states)
+- [Basic Usage](#basic-usage)
+- [Integration with Bloc/Cubit](#integration-with-bloccubit)
+  - [Simple Example](#simple-example)
+  - [Advanced Bloc Integration](#advanced-bloc-integration)
+  - [Using in UI](#using-in-ui)
+- [Advanced Usage](#advanced-usage)
+  - [Transforming Data](#transforming-data)
+  - [Error Handling](#error-handling)
+  - [Chaining Operations](#chaining-operations)
+  - [Recovery from Errors](#recovery-from-errors)
+- [Best Practices](#best-practices)
+- [API Reference](#api-reference)
+- [Review and Recommendations](#review-and-recommendations)
+- [Contributing](#contributing)
 
 ## Features
 
-- 🎯 Type-safe state handling
-- 🔄 Comprehensive state management
-- 🛠️ Rich functional programming utilities
-- 🧩 Seamless integration with Bloc/Cubit
-- ⚡ Efficient pattern matching
-- 🔍 Built-in error handling
+- 🎯 **Type-safe state handling** - Eliminates runtime errors with compile-time guarantees
+- 🔄 **Comprehensive state management** - Four distinct states for complete async operation coverage
+- 🛠️ **Rich functional programming utilities** - Map, flatMap, recover, and more
+- 🧩 **Seamless Bloc/Cubit integration** - Built specifically for the Bloc pattern
+- ⚡ **Efficient pattern matching** - Elegant state handling with when() methods
+- 🔍 **Built-in error handling** - Robust error management and recovery
+- 📱 **Flutter-first design** - Optimized for Flutter UI development
 
 ## Installation
 
@@ -64,32 +86,84 @@ result.when(
 );
 ```
 
-## Integration with Cubit
+## Integration with Bloc/Cubit
+
+AsyncResult is specifically designed to work seamlessly with the Bloc package, providing a clean and type-safe way to manage async operations in your Flutter applications.
+
+### Simple Example
 
 Here's a complete example showing how to use AsyncResult with Cubit for managing user data:
 
 ```dart
-// User model
+// Domain models
 class User {
   final String id;
   final String name;
+  final String email;
 
-  User({required this.id, required this.name});
+  const User({
+    required this.id,
+    required this.name,
+    required this.email,
+  });
+}
+
+// Error types
+sealed class UserError {
+  const UserError();
+}
+
+class NetworkError extends UserError {
+  final String message;
+  const NetworkError(this.message);
+}
+
+class NotFoundError extends UserError {
+  const NotFoundError();
 }
 
 // Repository
-class UserRepository {
+abstract class UserRepository {
+  Future<User> fetchUser(String id);
+  Future<List<User>> fetchUsers();
+}
+
+class ApiUserRepository implements UserRepository {
+  @override
   Future<User> fetchUser(String id) async {
-    // Simulating API call
+    // Simulating API call with potential failures
     await Future.delayed(const Duration(seconds: 1));
-    return User(id: id, name: "John Doe");
+    
+    if (id == 'error') {
+      throw const NetworkError('Failed to fetch user');
+    }
+    
+    if (id == 'notfound') {
+      throw const NotFoundError();
+    }
+    
+    return User(
+      id: id,
+      name: "John Doe",
+      email: "john.doe@example.com",
+    );
+  }
+
+  @override
+  Future<List<User>> fetchUsers() async {
+    await Future.delayed(const Duration(seconds: 2));
+    return [
+      const User(id: '1', name: 'Alice', email: 'alice@example.com'),
+      const User(id: '2', name: 'Bob', email: 'bob@example.com'),
+    ];
   }
 }
 
-// State
-typedef UserState = AsyncResult<User, Exception>;
+// State definitions
+typedef UserState = AsyncResult<User, UserError>;
+typedef UsersState = AsyncResult<List<User>, UserError>;
 
-// Cubit
+// Single User Cubit
 class UserCubit extends Cubit<UserState> {
   final UserRepository _repository;
 
@@ -101,33 +175,390 @@ class UserCubit extends Cubit<UserState> {
     try {
       final user = await _repository.fetchUser(id);
       emit(AsyncResult.data(user));
+    } on UserError catch (e) {
+      emit(AsyncResult.error(e));
     } catch (e) {
-      emit(AsyncResult.error(Exception(e.toString())));
+      emit(AsyncResult.error(NetworkError(e.toString())));
     }
+  }
+
+  void reset() {
+    emit(const AsyncResult.initial());
+  }
+}
+
+// Multiple Users Cubit
+class UsersCubit extends Cubit<UsersState> {
+  final UserRepository _repository;
+
+  UsersCubit(this._repository) : super(const AsyncResult.initial());
+
+  Future<void> loadUsers() async {
+    emit(const AsyncResult.loading());
+
+    try {
+      final users = await _repository.fetchUsers();
+      emit(AsyncResult.data(users));
+    } on UserError catch (e) {
+      emit(AsyncResult.error(e));
+    } catch (e) {
+      emit(AsyncResult.error(NetworkError(e.toString())));
+    }
+  }
+
+  void refresh() => loadUsers();
+}
+```
+
+### Advanced Bloc Integration
+
+For more complex scenarios, you can use full Bloc pattern with events:
+
+```dart
+// Events
+sealed class UserEvent {
+  const UserEvent();
+}
+
+class LoadUserRequested extends UserEvent {
+  final String userId;
+  const LoadUserRequested(this.userId);
+}
+
+class RefreshUserRequested extends UserEvent {
+  const RefreshUserRequested();
+}
+
+class ResetUserRequested extends UserEvent {
+  const ResetUserRequested();
+}
+
+// Bloc
+class UserBloc extends Bloc<UserEvent, UserState> {
+  final UserRepository _repository;
+  String? _currentUserId;
+
+  UserBloc(this._repository) : super(const AsyncResult.initial()) {
+    on<LoadUserRequested>(_onLoadUserRequested);
+    on<RefreshUserRequested>(_onRefreshUserRequested);
+    on<ResetUserRequested>(_onResetUserRequested);
+  }
+
+  Future<void> _onLoadUserRequested(
+    LoadUserRequested event,
+    Emitter<UserState> emit,
+  ) async {
+    _currentUserId = event.userId;
+    emit(const AsyncResult.loading());
+
+    try {
+      final user = await _repository.fetchUser(event.userId);
+      emit(AsyncResult.data(user));
+    } on UserError catch (e) {
+      emit(AsyncResult.error(e));
+    } catch (e) {
+      emit(AsyncResult.error(NetworkError(e.toString())));
+    }
+  }
+
+  Future<void> _onRefreshUserRequested(
+    RefreshUserRequested event,
+    Emitter<UserState> emit,
+  ) async {
+    if (_currentUserId != null) {
+      // Keep current state while refreshing
+      final currentState = state;
+      
+      try {
+        final user = await _repository.fetchUser(_currentUserId!);
+        emit(AsyncResult.data(user));
+      } on UserError catch (e) {
+        emit(AsyncResult.error(e));
+      } catch (e) {
+        // Revert to previous state on error during refresh
+        emit(currentState);
+      }
+    }
+  }
+
+  void _onResetUserRequested(
+    ResetUserRequested event,
+    Emitter<UserState> emit,
+  ) {
+    _currentUserId = null;
+    emit(const AsyncResult.initial());
   }
 }
 ```
 
 ### Using in UI
 
-Here's how to use the UserCubit in a Flutter widget:
+Here's how to use AsyncResult with Bloc in Flutter widgets:
+
+#### Basic BlocBuilder Usage
 
 ```dart
-class UserProfile extends StatelessWidget {
+class UserProfilePage extends StatelessWidget {
+  const UserProfilePage({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<UserCubit, UserState>(
-      builder: (context, state) {
-        return state.when(
-          whenInitial: () => const Text('Press button to load user'),
-          whenLoading: () => const CircularProgressIndicator(),
-          whenData: (user) => Column(
-            children: [
-              Text('ID: ${user.id}'),
-              Text('Name: ${user.name}'),
-            ],
+    return Scaffold(
+      appBar: AppBar(title: const Text('User Profile')),
+      body: BlocBuilder<UserCubit, UserState>(
+        builder: (context, state) {
+          return state.when(
+            whenInitial: () => const _InitialView(),
+            whenLoading: () => const _LoadingView(),
+            whenData: (user) => _UserDataView(user: user),
+            whenError: (error) => _ErrorView(error: error),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.read<UserCubit>().loadUser('123'),
+        child: const Icon(Icons.refresh),
+      ),
+    );
+  }
+}
+
+class _InitialView extends StatelessWidget {
+  const _InitialView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Press the button to load user data'),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Loading user...'),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserDataView extends StatelessWidget {
+  final User user;
+  
+  const _UserDataView({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'User Information',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 16),
+                  _InfoRow(label: 'ID', value: user.id),
+                  _InfoRow(label: 'Name', value: user.name),
+                  _InfoRow(label: 'Email', value: user.email),
+                ],
+              ),
+            ),
           ),
-          whenError: (error) => Text('Error: ${error.toString()}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final UserError error;
+  
+  const _ErrorView({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _getErrorMessage(error),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => context.read<UserCubit>().loadUser('123'),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getErrorMessage(UserError error) {
+    return switch (error) {
+      NetworkError(message: final msg) => 'Network Error: $msg',
+      NotFoundError() => 'User not found',
+    };
+  }
+}
+```
+
+#### Advanced UI Patterns
+
+For more complex UI patterns, you can use multiple BlocBuilders or BlocConsumer:
+
+```dart
+class UsersListPage extends StatelessWidget {
+  const UsersListPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Users'),
+        actions: [
+          BlocBuilder<UsersCubit, UsersState>(
+            builder: (context, state) {
+              return IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color: state.isLoading ? Colors.grey : null,
+                ),
+                onPressed: state.isLoading 
+                  ? null 
+                  : () => context.read<UsersCubit>().refresh(),
+              );
+            },
+          ),
+        ],
+      ),
+      body: BlocConsumer<UsersCubit, UsersState>(
+        listener: (context, state) {
+          // Show snackbar on error
+          state.whenError((error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_getErrorMessage(error)),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                action: SnackBarAction(
+                  label: 'Retry',
+                  onPressed: () => context.read<UsersCubit>().refresh(),
+                ),
+              ),
+            );
+          });
+        },
+        builder: (context, state) {
+          return state.when(
+            whenInitial: () => const _EmptyView(),
+            whenLoading: () => const _LoadingListView(),
+            whenData: (users) => _UsersListView(users: users),
+            whenError: (error) => _ErrorListView(error: error),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.read<UsersCubit>().loadUsers(),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  String _getErrorMessage(UserError error) {
+    return switch (error) {
+      NetworkError(message: final msg) => msg,
+      NotFoundError() => 'No users found',
+    };
+  }
+}
+
+class _UsersListView extends StatelessWidget {
+  final List<User> users;
+  
+  const _UsersListView({required this.users});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: users.length,
+      itemBuilder: (context, index) {
+        final user = users[index];
+        return ListTile(
+          leading: CircleAvatar(
+            child: Text(user.name.substring(0, 1).toUpperCase()),
+          ),
+          title: Text(user.name),
+          subtitle: Text(user.email),
+          onTap: () {
+            // Navigate to user detail or perform action
+            context.read<UserCubit>().loadUser(user.id);
+          },
         );
       },
     );
@@ -207,31 +638,279 @@ class UserCubit extends Cubit<AsyncResult<User, Exception>> {
 
 ## Best Practices
 
-1. **Type Safety**: Always specify both success and error types:
+### 1. Type Safety and Error Modeling
+
+Always specify both success and error types explicitly and use sealed classes for error modeling:
 
 ```dart
+// ❌ Avoid: Using dynamic or Exception
+typedef UserState = AsyncResult<User, dynamic>;
 typedef UserState = AsyncResult<User, Exception>;
+
+// ✅ Prefer: Specific error types
+sealed class UserError {
+  const UserError();
+}
+
+class NetworkError extends UserError {
+  final String message;
+  final int? statusCode;
+  const NetworkError(this.message, [this.statusCode]);
+}
+
+class ValidationError extends UserError {
+  final Map<String, String> fieldErrors;
+  const ValidationError(this.fieldErrors);
+}
+
+typedef UserState = AsyncResult<User, UserError>;
 ```
 
-2. **Initial State**: Start with initial state when creating a Cubit:
+### 2. Cubit/Bloc Initialization
+
+Always start with the initial state when creating a Cubit or Bloc:
 
 ```dart
-class MyCubit extends Cubit<AsyncResult<Data, Error>> {
-  MyCubit() : super(const AsyncResult.initial());
+// ✅ Correct initialization
+class UserCubit extends Cubit<AsyncResult<User, UserError>> {
+  UserCubit(this._repository) : super(const AsyncResult.initial());
+}
+
+class UserBloc extends Bloc<UserEvent, AsyncResult<User, UserError>> {
+  UserBloc(this._repository) : super(const AsyncResult.initial());
 }
 ```
 
-3. **Error Handling**: Use specific error types instead of dynamic:
+### 3. Consistent State Transitions
+
+Always emit loading state before async operations and handle all possible exceptions:
 
 ```dart
-AsyncResult<Data, NetworkError> instead of AsyncResult<Data, dynamic>
+// ✅ Proper state transitions
+Future<void> loadUser(String id) async {
+  emit(const AsyncResult.loading()); // Always emit loading first
+
+  try {
+    final user = await _repository.fetchUser(id);
+    emit(AsyncResult.data(user));
+  } on UserError catch (e) {
+    emit(AsyncResult.error(e)); // Catch domain-specific errors
+  } catch (e) {
+    emit(AsyncResult.error(NetworkError(e.toString()))); // Catch unexpected errors
+  }
+}
 ```
 
-4. **State Transitions**: Always emit loading state before async operations:
+### 4. UI State Handling
+
+Use proper state handling in UI with appropriate loading indicators and error states:
 
 ```dart
-emit(const AsyncResult.loading());
-// ... perform async work
+// ✅ Comprehensive UI state handling
+BlocBuilder<UserCubit, UserState>(
+  builder: (context, state) {
+    return state.when(
+      whenInitial: () => const EmptyStateWidget(),
+      whenLoading: () => const LoadingWidget(),
+      whenData: (user) => UserWidget(user: user),
+      whenError: (error) => ErrorWidget(
+        error: error,
+        onRetry: () => context.read<UserCubit>().loadUser(userId),
+      ),
+    );
+  },
+)
+```
+
+### 5. Separation of Concerns
+
+Keep business logic in repositories and use Cubits/Blocs for state management only:
+
+```dart
+// ✅ Clean separation
+class UserRepository {
+  Future<User> fetchUser(String id) async {
+    // All business logic here
+    final response = await _apiClient.get('/users/$id');
+    
+    if (response.statusCode == 404) {
+      throw const NotFoundError();
+    }
+    
+    if (response.statusCode != 200) {
+      throw NetworkError('Failed to fetch user: ${response.statusCode}');
+    }
+    
+    return User.fromJson(response.data);
+  }
+}
+
+class UserCubit extends Cubit<UserState> {
+  // Only state management logic here
+  Future<void> loadUser(String id) async {
+    emit(const AsyncResult.loading());
+    
+    try {
+      final user = await _repository.fetchUser(id);
+      emit(AsyncResult.data(user));
+    } on UserError catch (e) {
+      emit(AsyncResult.error(e));
+    }
+  }
+}
+```
+
+### 6. Testing Strategies
+
+Test each state explicitly and use proper mocking:
+
+```dart
+// ✅ Comprehensive testing
+void main() {
+  group('UserCubit', () {
+    late UserRepository mockRepository;
+    late UserCubit cubit;
+
+    setUp(() {
+      mockRepository = MockUserRepository();
+      cubit = UserCubit(mockRepository);
+    });
+
+    blocTest<UserCubit, UserState>(
+      'emits [loading, data] when loadUser succeeds',
+      build: () {
+        when(() => mockRepository.fetchUser('123'))
+            .thenAnswer((_) async => const User(id: '123', name: 'Test'));
+        return cubit;
+      },
+      act: (cubit) => cubit.loadUser('123'),
+      expect: () => [
+        const AsyncResult<User, UserError>.loading(),
+        const AsyncResult<User, UserError>.data(
+          User(id: '123', name: 'Test'),
+        ),
+      ],
+    );
+
+    blocTest<UserCubit, UserState>(
+      'emits [loading, error] when loadUser fails',
+      build: () {
+        when(() => mockRepository.fetchUser('123'))
+            .thenThrow(const NetworkError('Connection failed'));
+        return cubit;
+      },
+      act: (cubit) => cubit.loadUser('123'),
+      expect: () => [
+        const AsyncResult<User, UserError>.loading(),
+        const AsyncResult<User, UserError>.error(
+          NetworkError('Connection failed'),
+        ),
+      ],
+    );
+  });
+}
+```
+
+### 7. Memory Management
+
+Properly dispose of resources and avoid memory leaks:
+
+```dart
+// ✅ Proper resource management
+class UserCubit extends Cubit<UserState> {
+  final UserRepository _repository;
+  StreamSubscription? _subscription;
+
+  UserCubit(this._repository) : super(const AsyncResult.initial());
+
+  void startListening() {
+    _subscription = _repository.userStream.listen(
+      (user) => emit(AsyncResult.data(user)),
+      onError: (error) => emit(AsyncResult.error(NetworkError(error.toString()))),
+    );
+  }
+
+  @override
+  Future<void> close() {
+    _subscription?.cancel();
+    return super.close();
+  }
+}
+```
+
+### 8. Performance Optimization
+
+Use pattern matching efficiently and consider state caching:
+
+```dart
+// ✅ Efficient pattern matching
+Widget build(BuildContext context) {
+  return BlocBuilder<UserCubit, UserState>(
+    buildWhen: (previous, current) {
+      // Only rebuild when state actually changes
+      return previous != current;
+    },
+    builder: (context, state) {
+      // Use maybeWhen for partial state handling
+      return state.maybeWhen(
+        whenData: (user) => UserWidget(user: user),
+        orElse: () => const LoadingWidget(),
+      );
+    },
+  );
+}
+```
+
+### 9. State Composition
+
+For complex states, compose multiple AsyncResults:
+
+```dart
+// ✅ State composition
+class UserProfileState {
+  final AsyncResult<User, UserError> user;
+  final AsyncResult<List<Post>, PostError> posts;
+  final AsyncResult<UserSettings, SettingsError> settings;
+
+  const UserProfileState({
+    required this.user,
+    required this.posts,
+    required this.settings,
+  });
+
+  bool get isLoading => 
+    user.isLoading || posts.isLoading || settings.isLoading;
+
+  bool get hasAllData => 
+    user.hasData && posts.hasData && settings.hasData;
+}
+```
+
+### 10. Documentation and Code Clarity
+
+Always document your state types and business logic:
+
+```dart
+/// Represents the state of user authentication in the application.
+/// 
+/// This state manages the current user session and handles authentication
+/// operations like login, logout, and session validation.
+typedef AuthState = AsyncResult<AuthenticatedUser, AuthError>;
+
+/// Handles user authentication operations.
+/// 
+/// This cubit manages the authentication flow and maintains the current
+/// user session state. It integrates with [AuthRepository] for actual
+/// authentication operations.
+class AuthCubit extends Cubit<AuthState> {
+  /// Creates a new [AuthCubit] with the given [repository].
+  /// 
+  /// The cubit starts in the initial state, indicating no authentication
+  /// attempt has been made yet.
+  AuthCubit(this._repository) : super(const AsyncResult.initial());
+  
+  // ... implementation
+}
 ```
 
 ## API Reference
@@ -472,6 +1151,211 @@ await Future.wait(futures).then((completed) {
   }
 });
 ```
+
+## Review and Recommendations
+
+### Architecture Benefits
+
+AsyncResult provides significant architectural advantages for Flutter applications using the Bloc pattern:
+
+#### ✅ **Type Safety**
+- Eliminates runtime state-related errors through compile-time guarantees
+- Prevents common mistakes like accessing null data or unhandled error states
+- Improves code maintainability and developer confidence
+
+#### ✅ **Predictable State Management**
+- Four well-defined states cover all async operation scenarios
+- Clear state transitions make debugging easier
+- Consistent pattern across different features reduces cognitive load
+
+#### ✅ **Bloc Integration**
+- Seamlessly integrates with flutter_bloc package
+- Reduces boilerplate code in Cubit/Bloc implementations
+- Encourages clean separation of concerns
+
+### Performance Considerations
+
+#### **Memory Efficiency**
+- Lightweight implementation with minimal memory overhead
+- Immutable states prevent unnecessary rebuilds
+- Efficient pattern matching with when() methods
+
+#### **UI Performance**
+```dart
+// ✅ Efficient: Only rebuild when state changes
+BlocBuilder<UserCubit, UserState>(
+  buildWhen: (previous, current) => previous != current,
+  builder: (context, state) => state.when(...),
+)
+
+// ✅ Partial updates: Use maybeWhen for specific states
+state.maybeWhen(
+  whenData: (data) => DataWidget(data),
+  orElse: () => existingWidget, // Avoid unnecessary rebuilds
+)
+```
+
+### Common Pitfalls and Solutions
+
+#### 1. **State Granularity**
+```dart
+// ❌ Avoid: Too many states in one AsyncResult
+class UserProfileState {
+  final AsyncResult<ComplexObject, Error> everything;
+}
+
+// ✅ Prefer: Separate concerns
+class UserProfileState {
+  final AsyncResult<User, UserError> user;
+  final AsyncResult<List<Post>, PostError> posts;
+  final AsyncResult<Settings, SettingsError> settings;
+}
+```
+
+#### 2. **Error Handling**
+```dart
+// ❌ Avoid: Generic error handling
+try {
+  // operation
+} catch (e) {
+  emit(AsyncResult.error(e)); // Loss of type safety
+}
+
+// ✅ Prefer: Specific error handling
+try {
+  // operation
+} on NetworkException catch (e) {
+  emit(AsyncResult.error(NetworkError(e.message)));
+} on ValidationException catch (e) {
+  emit(AsyncResult.error(ValidationError(e.errors)));
+} catch (e) {
+  emit(AsyncResult.error(UnknownError(e.toString())));
+}
+```
+
+#### 3. **State Persistence**
+```dart
+// ✅ Handle app lifecycle properly
+class UserCubit extends Cubit<UserState> with HydratedMixin {
+  @override
+  UserState fromJson(Map<String, dynamic> json) {
+    // Only restore data state, not loading/error states
+    if (json['type'] == 'data') {
+      return AsyncResult.data(User.fromJson(json['data']));
+    }
+    return const AsyncResult.initial();
+  }
+
+  @override
+  Map<String, dynamic>? toJson(UserState state) {
+    return state.whenOrNull(
+      whenData: (user) => {
+        'type': 'data',
+        'data': user.toJson(),
+      },
+    );
+  }
+}
+```
+
+### When to Use AsyncResult
+
+#### **✅ Perfect For:**
+- Bloc/Cubit state management in Flutter apps
+- API call handling with loading states
+- Form submission with validation feedback
+- Data fetching with error recovery
+- Complex async operations with multiple states
+
+#### **❌ Consider Alternatives For:**
+- Simple boolean flags or single values
+- Synchronous operations
+- Real-time streaming data (consider StreamBuilder)
+- Complex state machines (consider state_machine packages)
+
+### Migration Strategy
+
+#### **From Existing Code:**
+```dart
+// Before: Manual state management
+class UserCubit extends Cubit<User?> {
+  bool isLoading = false;
+  String? error;
+  
+  Future<void> loadUser() async {
+    isLoading = true;
+    error = null;
+    // ... complex state tracking
+  }
+}
+
+// After: AsyncResult
+class UserCubit extends Cubit<AsyncResult<User, UserError>> {
+  UserCubit() : super(const AsyncResult.initial());
+  
+  Future<void> loadUser() async {
+    emit(const AsyncResult.loading());
+    // ... clean state management
+  }
+}
+```
+
+### Testing Recommendations
+
+#### **State Testing**
+```dart
+// Test all state transitions
+void main() {
+  group('UserCubit State Transitions', () {
+    test('initial state is AsyncInitial', () {
+      expect(cubit.state.isInitial, true);
+    });
+
+    blocTest<UserCubit, UserState>(
+      'loading → data transition',
+      build: () => cubit,
+      act: (cubit) => cubit.loadUser('123'),
+      expect: () => [
+        predicate<UserState>((state) => state.isLoading),
+        predicate<UserState>((state) => state.hasData),
+      ],
+    );
+  });
+}
+```
+
+#### **Error Scenario Testing**
+```dart
+blocTest<UserCubit, UserState>(
+  'handles network errors gracefully',
+  build: () {
+    when(() => repository.fetchUser(any()))
+        .thenThrow(NetworkException('No internet'));
+    return cubit;
+  },
+  act: (cubit) => cubit.loadUser('123'),
+  expect: () => [
+    predicate<UserState>((state) => state.isLoading),
+    predicate<UserState>((state) => 
+        state.hasError && state.errorOrNull is NetworkError),
+  ],
+);
+```
+
+### Future Enhancements
+
+Based on community feedback, consider these patterns for advanced usage:
+
+1. **Pagination Support**: Combine with paginated lists
+2. **Optimistic Updates**: Implement optimistic UI patterns
+3. **Offline Support**: Integrate with cache-first strategies
+4. **Real-time Updates**: Combine with WebSocket streams
+
+### Community Resources
+
+- **Examples**: Check the `/example` folder for comprehensive usage patterns
+- **Extensions**: Consider creating custom extensions for your domain
+- **Testing**: Use the provided test utilities for consistent testing
 
 ## Contributing
 
