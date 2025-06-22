@@ -1,3 +1,7 @@
+## 1.1.2
+
+- add test and documentation for AsyncResult class.
+
 ## 1.1.1
 
 - remove deprecated fields from equality check
