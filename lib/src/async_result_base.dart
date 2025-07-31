@@ -87,6 +87,32 @@ sealed class AsyncResult<T, E> {
   /// ```
   const factory AsyncResult.error(E error) = AsyncError<T, E>;
 
+  /// Converts from Json.
+  ///
+  /// Json serialization support for `json_serializable` with `@JsonSerializable`.
+  /// This factory method allows you to create an [AsyncResult] from a JSON object.
+  /// It expects the JSON to represent a successful data state.
+  /// If the JSON is null or cannot be parsed, it returns an initial state.
+  factory AsyncResult.fromJson(
+    dynamic json,
+    T Function(dynamic json) fromJsonT,
+  ) {
+    if (json != null) {
+      try {
+        return AsyncResult.data(fromJsonT(json));
+      } catch (e) {
+        return AsyncResult.initial();
+      }
+    }
+    return AsyncResult.initial();
+  }
+
+  /// Converts to Json.
+  ///
+  /// Json serialization support for `json_serializable` with `@JsonSerializable`.
+  /// This method allows you to convert an [AsyncResult] instance to a JSON object.
+  Object? toJson(Object? Function(T data) toJsonT);
+
   /// Checks if all results in the iterable are completed (either success or error).
   ///
   /// Parameters:
@@ -1195,6 +1221,9 @@ final class AsyncInitial<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => runtimeType.hashCode;
+
+  @override
+  Object? toJson(Object? Function(T data) toJsonT) => null;
 }
 
 /// Represents the loading state of an asynchronous operation.
@@ -1346,6 +1375,9 @@ final class AsyncLoading<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => runtimeType.hashCode;
+
+  @override
+  Object? toJson(Object? Function(T data) toJsonT) => null;
 }
 
 /// Represents a successful state of an asynchronous operation with data.
@@ -1507,6 +1539,9 @@ final class AsyncData<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => _data.hashCode;
+
+  @override
+  Object? toJson(Object? Function(T data) toJsonT) => toJsonT(_data);
 }
 
 /// Represents an error state of an asynchronous operation.
@@ -1665,4 +1700,7 @@ final class AsyncError<T, E> extends AsyncResult<T, E> {
 
   @override
   int get hashCode => _error.hashCode;
+
+  @override
+  Object? toJson(Object? Function(T data) toJsonT) => null;
 }

@@ -780,4 +780,208 @@ void main() {
       expect(exception.toString(), contains('errorOrNull'));
     });
   });
+
+  group('AsyncResult JSON Serialization', () {
+    test('fromJson() creates data state from valid JSON', () {
+      const jsonValue = 42;
+      final result = AsyncResult<int, String>.fromJson(
+        jsonValue,
+        (json) => json as int,
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(result.dataOrThrow, equals(42));
+    });
+
+    test('fromJson() creates data state from complex JSON', () {
+      final jsonValue = {'name': 'John', 'age': 30};
+      final result = AsyncResult<Map<String, dynamic>, String>.fromJson(
+        jsonValue,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      expect(result.isSuccess, isTrue);
+      expect(result.dataOrThrow, equals({'name': 'John', 'age': 30}));
+    });
+
+    test('fromJson() returns initial state when JSON is null', () {
+      final result = AsyncResult<int, String>.fromJson(
+        null,
+        (json) => json as int,
+      );
+
+      expect(result.isInitial, isTrue);
+    });
+
+    test('fromJson() returns initial state when parsing fails', () {
+      const invalidJson = 'invalid';
+      final result = AsyncResult<int, String>.fromJson(
+        invalidJson,
+        (json) => throw FormatException('Parse error'),
+      );
+
+      expect(result.isInitial, isTrue);
+    });
+
+    test('fromJson() handles string to int conversion with error', () {
+      const stringValue = 'not_a_number';
+      final result = AsyncResult<int, String>.fromJson(
+        stringValue,
+        (json) => int.parse(json as String),
+      );
+
+      expect(result.isInitial, isTrue);
+    });
+
+    test('toJson() returns serialized data for success state', () {
+      final result = AsyncResult<int, String>.data(42);
+      final json = result.toJson((data) => data);
+
+      expect(json, equals(42));
+    });
+
+    test('toJson() returns serialized complex data for success state', () {
+      final data = {'name': 'John', 'age': 30};
+      final result = AsyncResult<Map<String, dynamic>, String>.data(data);
+      final json = result.toJson((data) => data);
+
+      expect(json, equals({'name': 'John', 'age': 30}));
+    });
+
+    test('toJson() transforms data using provided serializer', () {
+      final result = AsyncResult<int, String>.data(42);
+      final json = result.toJson((data) => data.toString());
+
+      expect(json, equals('42'));
+    });
+
+    test('toJson() returns null for initial state', () {
+      final result = AsyncResult<int, String>.initial();
+      final json = result.toJson((data) => data);
+
+      expect(json, isNull);
+    });
+
+    test('toJson() returns null for loading state', () {
+      final result = AsyncResult<int, String>.loading();
+      final json = result.toJson((data) => data);
+
+      expect(json, isNull);
+    });
+
+    test('toJson() returns null for error state', () {
+      final result = AsyncResult<int, String>.error('failed');
+      final json = result.toJson((data) => data);
+
+      expect(json, isNull);
+    });
+
+    test('Round-trip serialization limitation - only data state survives', () {
+      // Test data state round-trip
+      final originalData = AsyncResult<String, String>.data('hello');
+      final jsonData = originalData.toJson((data) => data);
+      final restoredData = AsyncResult<String, String>.fromJson(
+        jsonData,
+        (json) => json as String,
+      );
+
+      expect(restoredData.isSuccess, isTrue);
+      expect(restoredData.dataOrThrow, equals('hello'));
+
+      // Test that other states become initial when round-tripped
+      final originalLoading = AsyncResult<String, String>.loading();
+      final jsonLoading = originalLoading.toJson((data) => data);
+      final restoredLoading = AsyncResult<String, String>.fromJson(
+        jsonLoading, // This is null
+        (json) => json as String,
+      );
+
+      expect(restoredLoading.isInitial, isTrue);
+
+      final originalError = AsyncResult<String, String>.error('failed');
+      final jsonError = originalError.toJson((data) => data);
+      final restoredError = AsyncResult<String, String>.fromJson(
+        jsonError, // This is null
+        (json) => json as String,
+      );
+
+      expect(restoredError.isInitial, isTrue);
+
+      final originalInitial = AsyncResult<String, String>.initial();
+      final jsonInitial = originalInitial.toJson((data) => data);
+      final restoredInitial = AsyncResult<String, String>.fromJson(
+        jsonInitial, // This is null
+        (json) => json as String,
+      );
+
+      expect(restoredInitial.isInitial, isTrue);
+    });
+
+    test('JSON serialization with custom objects', () {
+      // Define a simple test class
+      final testUser = TestUser('Alice', 25);
+      final result = AsyncResult<TestUser, String>.data(testUser);
+
+      // Serialize to JSON
+      final json = result.toJson((user) => user.toJson());
+      expect(json, equals({'name': 'Alice', 'age': 25}));
+
+      // Deserialize from JSON
+      final restored = AsyncResult<TestUser, String>.fromJson(
+        json,
+        (json) => TestUser.fromJson(json as Map<String, dynamic>),
+      );
+
+      expect(restored.isSuccess, isTrue);
+      expect(restored.dataOrThrow.name, equals('Alice'));
+      expect(restored.dataOrThrow.age, equals(25));
+    });
+
+    test('fromJson() with nested JSON structure', () {
+      final complexJson = {
+        'user': {'name': 'Bob', 'age': 35},
+        'posts': [
+          {'title': 'Post 1', 'content': 'Content 1'},
+          {'title': 'Post 2', 'content': 'Content 2'},
+        ]
+      };
+
+      final result = AsyncResult<Map<String, dynamic>, String>.fromJson(
+        complexJson,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      expect(result.isSuccess, isTrue);
+      final data = result.dataOrThrow;
+      expect(data['user']['name'], equals('Bob'));
+      expect(data['posts'], hasLength(2));
+      expect(data['posts'][0]['title'], equals('Post 1'));
+    });
+
+    test('toJson() serializer can throw and be caught externally', () {
+      final result = AsyncResult<int, String>.data(42);
+
+      expect(() {
+        result.toJson((data) => throw Exception('Serialization failed'));
+      }, throwsException);
+    });
+  });
+}
+
+// Helper class for testing custom object serialization
+class TestUser {
+  final String name;
+  final int age;
+
+  TestUser(this.name, this.age);
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'age': age,
+      };
+
+  static TestUser fromJson(Map<String, dynamic> json) => TestUser(
+        json['name'] as String,
+        json['age'] as int,
+      );
 }

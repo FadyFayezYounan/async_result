@@ -1,3 +1,7 @@
+## 1.1.3
+
+- add fromJson and toJson methods to classes.
+
 ## 1.1.2
 
 - add test and documentation for AsyncResult class.
